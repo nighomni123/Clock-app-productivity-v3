@@ -1,0 +1,10 @@
+{
+  "short_name": "FocusClock",
+  "name": "Focus Study Clock & Productivity",
+  "start_url": "/",
+  "background_color": "#000000",
+  "theme_color": "#09090b",
+  "display": "standalone",
+  "orientation": "any",
+  "description": "Study productivity app with timetable, task queue, Firestore sync, push notifications, and Google Calendar scheduling."
+}
