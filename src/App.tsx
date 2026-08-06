@@ -18,6 +18,7 @@ import {
   TaskItem,
   TimetableBlock,
   DistractionItem,
+  StudySession,
   DailyTarget,
   DailyStats,
   UserAuth,
@@ -35,6 +36,8 @@ import {
   where,
   addDoc,
   deleteDoc,
+  writeBatch,
+  handleFirestoreError,
   onAuthStateChanged,
   signInAnonymouslyUser
 } from './lib/firebase';
@@ -91,6 +94,25 @@ export default function App() {
   });
 
   const [syncCode, setSyncCode] = useState<string | null>(() => localStorage.getItem('focus_sync_code'));
+  const [isTabVisible, setIsTabVisible] = useState<boolean>(() => (typeof document !== 'undefined' ? !document.hidden : true));
+
+  // Debounce timeout refs to reduce write frequency for text inputs
+  const notesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intentionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dailySessionsRef = useRef<StudySession[]>([]);
+
+  // Track tab visibility to pause real-time Firestore listeners when app is hidden/in background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
+      if (intentionTimeoutRef.current) clearTimeout(intentionTimeoutRef.current);
+    };
+  }, []);
 
   // Track online status
   useEffect(() => {
@@ -148,9 +170,9 @@ export default function App() {
     return () => unsub();
   }, [syncCode]);
 
-  // Sync User Document & Settings from Firestore
+  // Sync User Document & Settings from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || !userAuth?.uid) return;
     const userDocRef = doc(db, 'users', userAuth.uid);
 
     const unsubscribe = onSnapshot(
@@ -176,18 +198,50 @@ export default function App() {
               intention: ''
             },
             { merge: true }
-          ).catch((e) => console.warn('User doc init:', e));
+          ).catch((e) => handleFirestoreError(e, 'write', `users/${userAuth.uid}`));
         }
       },
-      (err) => console.warn('Firestore user doc snapshot error:', err)
+      (err) => handleFirestoreError(err, 'read', `users/${userAuth.uid}`)
     );
 
     return () => unsubscribe();
-  }, [userAuth?.uid, userAuth?.isAnonymous, syncCode]);
+  }, [userAuth?.uid, userAuth?.isAnonymous, syncCode, isTabVisible]);
 
-  // Sync Tasks from Firestore
+  // Sync Daily Aggregated Record (Sessions, Distractions, Today Stats in 1 Document)
   useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || !userAuth?.uid) return;
+    const todayKey = getTodayKey();
+    const dailyDocRef = doc(db, 'users', userAuth.uid, 'daily', todayKey);
+
+    const unsubscribe = onSnapshot(
+      dailyDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data.stats) {
+            setTodayStats({
+              focusMinutes: data.stats.focusMinutes || 0,
+              sessions: data.stats.sessions || 0,
+              distractions: data.stats.distractions || 0
+            });
+          }
+          if (Array.isArray(data.sessions)) {
+            dailySessionsRef.current = data.sessions;
+          }
+          if (Array.isArray(data.distractions)) {
+            setDistractions(data.distractions);
+          }
+        }
+      },
+      (err) => handleFirestoreError(err, 'read', `users/${userAuth.uid}/daily/${todayKey}`)
+    );
+
+    return () => unsubscribe();
+  }, [userAuth?.uid, syncCode, isTabVisible]);
+
+  // Sync Tasks from Firestore (Visibility-Aware)
+  useEffect(() => {
+    if (!isTabVisible || syncCode || !userAuth?.uid) return;
     const tasksRef = collection(db, 'tasks');
     const q = query(tasksRef, where('userId', '==', userAuth.uid));
 
@@ -201,15 +255,15 @@ export default function App() {
         loadedTasks.sort((a, b) => b.createdAt - a.createdAt);
         setTasks(loadedTasks);
       },
-      (err) => console.warn('Firestore tasks snapshot error:', err)
+      (err) => handleFirestoreError(err, 'read', 'tasks')
     );
 
     return () => unsubscribe();
-  }, [userAuth?.uid, syncCode]);
+  }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Sync Timetables from Firestore
+  // Sync Timetables from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || !userAuth?.uid) return;
     const timetablesRef = collection(db, 'timetables');
     const q = query(timetablesRef, where('userId', '==', userAuth.uid));
 
@@ -222,45 +276,15 @@ export default function App() {
         });
         setTimetables(loadedBlocks);
       },
-      (err) => console.warn('Firestore timetables snapshot error:', err)
+      (err) => handleFirestoreError(err, 'read', 'timetables')
     );
 
     return () => unsubscribe();
-  }, [userAuth?.uid, syncCode]);
+  }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Sync Distraction Logs from Firestore
+  // Sync Activity Logs from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
-    const distractionsRef = collection(db, 'distractions');
-    const q = query(distractionsRef, where('userId', '==', userAuth.uid));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const loadedDistractions: DistractionItem[] = [];
-        snapshot.forEach((docSnap) => {
-          loadedDistractions.push({ id: docSnap.id, ...docSnap.data() } as DistractionItem);
-        });
-        loadedDistractions.sort((a, b) => b.createdAt - a.createdAt);
-        setDistractions(loadedDistractions);
-
-        // Update distraction count for today
-        const todayKey = getTodayKey();
-        const countToday = loadedDistractions.filter(
-          (d) => new Date(d.createdAt).toISOString().slice(0, 10) === todayKey
-        ).length;
-
-        setTodayStats((prev) => ({ ...prev, distractions: countToday }));
-      },
-      (err) => console.warn('Firestore distractions snapshot error:', err)
-    );
-
-    return () => unsubscribe();
-  }, [userAuth?.uid, syncCode]);
-
-  // Sync Activity Logs from Firestore
-  useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || !userAuth?.uid) return;
     const logsRef = collection(db, 'activity_logs');
     const q = query(logsRef, where('userId', '==', userAuth.uid));
 
@@ -274,15 +298,15 @@ export default function App() {
         loaded.sort((a, b) => b.startTime - a.startTime);
         setActivityLogs(loaded);
       },
-      (err) => console.warn('Firestore activity_logs snapshot error:', err)
+      (err) => handleFirestoreError(err, 'read', 'activity_logs')
     );
 
     return () => unsubscribe();
-  }, [userAuth?.uid, syncCode]);
+  }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Sync Quick Notes from Firestore
+  // Sync Quick Notes from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || !userAuth?.uid) return;
     const notesDocRef = doc(db, 'notes', userAuth.uid);
 
     const unsubscribe = onSnapshot(
@@ -292,45 +316,11 @@ export default function App() {
           setNotes(snapshot.data().content || '');
         }
       },
-      (err) => console.warn('Firestore notes snapshot error:', err)
+      (err) => handleFirestoreError(err, 'read', `notes/${userAuth.uid}`)
     );
 
     return () => unsubscribe();
-  }, [userAuth?.uid, syncCode]);
-
-  // Sync Today's Sessions stats
-  useEffect(() => {
-    if (syncCode || !userAuth?.uid) return;
-    const todayKey = getTodayKey();
-    const sessionsRef = collection(db, 'sessions');
-    const q = query(
-      sessionsRef,
-      where('userId', '==', userAuth.uid),
-      where('dateKey', '==', todayKey)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        let totalFocusMin = 0;
-        let totalSessionsCount = 0;
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          totalFocusMin += data.focusMinutes || 0;
-          totalSessionsCount += 1;
-        });
-
-        setTodayStats((prev) => ({
-          ...prev,
-          focusMinutes: totalFocusMin,
-          sessions: totalSessionsCount
-        }));
-      },
-      (err) => console.warn('Firestore sessions snapshot error:', err)
-    );
-
-    return () => unsubscribe();
-  }, [userAuth?.uid, syncCode]);
+  }, [userAuth?.uid, syncCode, isTabVisible]);
 
   // Periodic Study Block Notification Inspector (runs every 30 seconds)
   useEffect(() => {
@@ -505,18 +495,22 @@ export default function App() {
   );
 
   const handleUpdateIntention = useCallback(
-    async (newIntention: string) => {
+    (newIntention: string) => {
       setIntention(newIntention);
       if (syncCode) {
         updateSyncDoc(syncCode, { intention: newIntention });
         return;
       }
       if (!userAuth?.uid) return;
-      try {
-        await setDoc(doc(db, 'users', userAuth.uid), { intention: newIntention }, { merge: true });
-      } catch (err) {
-        console.warn('Error saving intention:', err);
-      }
+
+      if (intentionTimeoutRef.current) clearTimeout(intentionTimeoutRef.current);
+      intentionTimeoutRef.current = setTimeout(async () => {
+        try {
+          await setDoc(doc(db, 'users', userAuth.uid), { intention: newIntention }, { merge: true });
+        } catch (err) {
+          handleFirestoreError(err, 'write', `users/${userAuth.uid}`);
+        }
+      }, 2500); // 2.5s debounce to save writes
     },
     [userAuth?.uid, syncCode]
   );
@@ -641,7 +635,7 @@ export default function App() {
 
   const handleLogDistraction = useCallback(
     async (text: string, sessionGoal: string, durationSeconds?: number) => {
-      const newDistraction = {
+      const newDistraction: DistractionItem = {
         id: Math.random().toString(36).substring(2, 10),
         userId: userAuth?.uid || 'anonymous',
         text,
@@ -650,85 +644,161 @@ export default function App() {
         ...(durationSeconds !== undefined ? { durationSeconds } : {})
       };
 
+      // Local React State updates instantly
+      setDistractions((prev) => [newDistraction, ...prev]);
+      setTodayStats((prev) => ({ ...prev, distractions: prev.distractions + 1 }));
+
       if (syncCode) {
         setDistractions((prev) => {
-          const next = [newDistraction, ...prev];
-          updateSyncDoc(syncCode, { distractions: next });
-          return next;
-        });
-        setTodayStats((prev) => {
-          const next = { ...prev, distractions: prev.distractions + 1 };
-          updateSyncDoc(syncCode, { todayStats: next });
-          return next;
+          updateSyncDoc(syncCode, { distractions: prev });
+          return prev;
         });
         return;
       }
 
       if (!userAuth?.uid) return;
       try {
-        await addDoc(collection(db, 'distractions'), newDistraction);
+        const todayKey = getTodayKey();
+        const batch = writeBatch(db);
+
+        // 1. Write to daily aggregated doc
+        const dailyRef = doc(db, 'users', userAuth.uid, 'daily', todayKey);
+        const updatedDistractions = [newDistraction, ...distractions];
+        batch.set(
+          dailyRef,
+          {
+            dateKey: todayKey,
+            userId: userAuth.uid,
+            updatedAt: Date.now(),
+            stats: {
+              focusMinutes: todayStats.focusMinutes,
+              sessions: todayStats.sessions,
+              distractions: todayStats.distractions + 1
+            },
+            distractions: updatedDistractions
+          },
+          { merge: true }
+        );
+
+        // 2. Also write to standalone distractions collection in same batch for compatibility
+        const newDistractionDocRef = doc(collection(db, 'distractions'));
+        batch.set(newDistractionDocRef, newDistraction);
+
+        await batch.commit();
       } catch (err) {
-        console.warn('Error logging distraction:', err);
+        handleFirestoreError(err, 'write', `users/${userAuth?.uid}/daily`);
       }
     },
-    [userAuth?.uid, syncCode]
+    [userAuth?.uid, syncCode, distractions, todayStats]
   );
 
   const handleUpdateNotes = useCallback(
-    async (newNotes: string) => {
+    (newNotes: string) => {
       setNotes(newNotes);
       if (syncCode) {
         updateSyncDoc(syncCode, { notes: newNotes });
         return;
       }
       if (!userAuth?.uid) return;
-      try {
-        await setDoc(
-          doc(db, 'notes', userAuth.uid),
-          {
-            userId: userAuth.uid,
-            content: newNotes,
-            updatedAt: new Date().toISOString()
-          },
-          { merge: true }
-        );
-      } catch (err) {
-        console.warn('Error updating notes:', err);
-      }
+
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
+      notesTimeoutRef.current = setTimeout(async () => {
+        try {
+          await setDoc(
+            doc(db, 'notes', userAuth.uid),
+            {
+              userId: userAuth.uid,
+              content: newNotes,
+              updatedAt: new Date().toISOString()
+            },
+            { merge: true }
+          );
+        } catch (err) {
+          handleFirestoreError(err, 'write', `notes/${userAuth.uid}`);
+        }
+      }, 2500); // 2.5s debounce to drastically reduce write operations
     },
     [userAuth?.uid, syncCode]
   );
 
   const handleLogCompletedSession = useCallback(
     async (focusMins: number) => {
+      const todayKey = getTodayKey();
+
+      // Local UI update instantly
+      setTodayStats((prev) => ({
+        ...prev,
+        focusMinutes: prev.focusMinutes + focusMins,
+        sessions: prev.sessions + 1
+      }));
+
       if (syncCode) {
         setTodayStats((prev) => {
-          const next = {
-            ...prev,
-            focusMinutes: prev.focusMinutes + focusMins,
-            sessions: prev.sessions + 1
-          };
-          updateSyncDoc(syncCode, { todayStats: next });
-          return next;
+          updateSyncDoc(syncCode, { todayStats: prev });
+          return prev;
         });
         return;
       }
 
       if (!userAuth?.uid) return;
+
       try {
-        await addDoc(collection(db, 'sessions'), {
+        const batch = writeBatch(db);
+        const dailyRef = doc(db, 'users', userAuth.uid, 'daily', todayKey);
+        const summaryRef = doc(db, 'users', userAuth.uid, 'stats', 'summary');
+        const sessionDocRef = doc(collection(db, 'sessions'));
+
+        const newSessionItem: StudySession = {
+          id: sessionDocRef.id,
           userId: userAuth.uid,
           title: intention || 'Focus Session',
           focusMinutes: focusMins,
           breakMinutes: settings.breakMinutes,
           completedAt: Date.now(),
-          dateKey: getTodayKey()
-        });
+          dateKey: todayKey
+        };
+
+        const updatedSessions = [...dailySessionsRef.current, newSessionItem];
+        dailySessionsRef.current = updatedSessions;
+
+        // 1. Batched update to daily aggregated doc
+        batch.set(
+          dailyRef,
+          {
+            dateKey: todayKey,
+            userId: userAuth.uid,
+            updatedAt: Date.now(),
+            stats: {
+              focusMinutes: todayStats.focusMinutes + focusMins,
+              sessions: todayStats.sessions + 1,
+              distractions: todayStats.distractions
+            },
+            sessions: updatedSessions
+          },
+          { merge: true }
+        );
+
+        // 2. Batched update to summary rollup doc
+        batch.set(
+          summaryRef,
+          {
+            userId: userAuth.uid,
+            updatedAt: Date.now(),
+            totalFocusMinutes: (todayStats.focusMinutes || 0) + focusMins,
+            totalSessions: (todayStats.sessions || 0) + 1
+          },
+          { merge: true }
+        );
+
+        // 3. Batched add to sessions collection for compatibility
+        batch.set(sessionDocRef, newSessionItem);
+
+        await batch.commit();
       } catch (err) {
-        console.warn('Error logging completed session:', err);
+        handleFirestoreError(err, 'write', `users/${userAuth.uid}/daily/${todayKey}`);
       }
     },
-    [intention, settings.breakMinutes, userAuth?.uid, syncCode]
+    [intention, settings.breakMinutes, userAuth?.uid, syncCode, todayStats]
   );
 
   const handleStartFocusForTask = useCallback((taskTitle: string) => {

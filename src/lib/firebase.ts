@@ -21,8 +21,17 @@ import {
   where,
   addDoc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  writeBatch,
+  getDocs
 } from 'firebase/firestore';
+
+export type OperationType = 'create' | 'update' | 'delete' | 'read' | 'write';
+
+export function handleFirestoreError(error: unknown, operation: OperationType, path: string): void {
+  const err = error as { code?: string; message?: string };
+  console.warn(`Firestore ${operation} error on path [${path}]:`, err?.code || err?.message || error);
+}
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 // Initialize Firebase
@@ -117,6 +126,8 @@ export {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
+  getDocs,
   onAuthStateChanged,
   type User
 };
