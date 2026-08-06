@@ -9,6 +9,7 @@ export interface UserSettings {
   autoStartFocus: boolean;
   enableNotifications: boolean;
   notificationLeadMinutes: number;
+  strictMode: boolean;
 }
 
 export interface ExamState {
@@ -47,6 +48,7 @@ export interface DistractionItem {
   text: string;
   sessionIntention: string;
   createdAt: number;
+  durationSeconds?: number;
 }
 
 export interface StudySession {
@@ -69,6 +71,18 @@ export interface DailyStats {
   focusMinutes: number;
   sessions: number;
   distractions: number;
+}
+
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  title: string;
+  category: string;
+  startTime: number;
+  endTime: number;
+  rating: number; // 1 to 5
+  notes?: string;
+  createdAt: number;
 }
 
 export interface UserAuth {
