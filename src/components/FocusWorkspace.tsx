@@ -15,7 +15,7 @@ interface FocusWorkspaceProps {
   notes: string;
   onUpdateNotes: (notes: string) => void;
   distractionLog: DistractionItem[];
-  onLogDistraction: (text: string, intention: string) => void;
+  onLogDistraction: (text: string, intention: string, durationSeconds?: number) => void;
   onLogCompletedSession: (focusMinutes: number) => void;
 }
 
@@ -55,6 +55,51 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
 
   const endTimeRef = useRef(0);
   const completionLockRef = useRef(false);
+  const strictModePausedAtRef = useRef<number | null>(null);
+  const [strictAlert, setStrictAlert] = useState<{ durationSeconds: number } | null>(null);
+
+  const isRunningRef = useRef(isRunning);
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+
+  const modeRef = useRef(mode);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  const timeLeftRef = useRef(timeLeft);
+  useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+  useEffect(() => {
+    if (!settings.strictMode) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (isRunningRef.current && modeRef.current === 'focus') {
+          strictModePausedAtRef.current = Date.now();
+          const remaining = Math.max(0, endTimeRef.current - Date.now());
+          setTimeLeft(remaining);
+          setIsRunning(false);
+        }
+      } else {
+        if (strictModePausedAtRef.current !== null) {
+          const durationMs = Date.now() - strictModePausedAtRef.current;
+          const durationSeconds = Math.round(durationMs / 1000);
+          
+          if (durationSeconds >= 1) {
+            onLogDistraction('Strict Mode: App sent to background', intention || 'General Study', durationSeconds);
+            setStrictAlert({ durationSeconds });
+            setTimeout(() => setStrictAlert(null), 5000);
+          }
+          
+          strictModePausedAtRef.current = null;
+          completionLockRef.current = false;
+          endTimeRef.current = Date.now() + timeLeftRef.current;
+          setIsRunning(true);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [settings.strictMode, intention, onLogDistraction]);
 
   const durationForMode = useCallback(
     (m: 'focus' | 'break' | 'longBreak') => {
@@ -233,6 +278,18 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
               : 'min-h-[480px] rounded-3xl border border-zinc-800/80 bg-zinc-900/45 p-8 h-full backdrop-blur-sm'
           }`}
         >
+          {/* Strict Mode Alert Overlay */}
+          {strictAlert && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-2 rounded-xl backdrop-blur-md shadow-xl flex items-center gap-2">
+                <span className="text-sm font-medium">Strict Mode Triggered!</span>
+                <span className="text-xs bg-rose-950/50 px-1.5 py-0.5 rounded text-rose-300 border border-rose-900/50">
+                  {strictAlert.durationSeconds > 60 ? `${Math.round(strictAlert.durationSeconds / 60)}m` : `${strictAlert.durationSeconds}s`} recorded
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Ambient Progress Fill */}
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 bg-zinc-800/20 transition-all duration-500 ease-linear"
@@ -457,9 +514,14 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
                 <p className="text-center text-zinc-600 mt-4">No distractions logged today.</p>
               ) : (
                 distractionLog.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-zinc-800/50 bg-black/40 p-2 flex justify-between items-center">
-                    <span className="text-zinc-300 truncate max-w-[70%]">{item.text}</span>
-                    <span className="text-[10px] text-zinc-500">
+                  <div key={item.id} className="rounded-lg border border-zinc-800/50 bg-black/40 p-2 flex justify-between items-center gap-2">
+                    <span className="text-zinc-300 truncate flex-grow">{item.text}</span>
+                    {item.durationSeconds !== undefined && (
+                      <span className="text-[10px] text-amber-500/80 bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-900/40 shrink-0">
+                        {item.durationSeconds > 60 ? `${Math.round(item.durationSeconds / 60)}m` : `${item.durationSeconds}s`}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-zinc-500 shrink-0">
                       {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>

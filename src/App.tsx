@@ -11,6 +11,7 @@ import { TimetableCalendar } from './components/TimetableCalendar';
 import { TaskQueue } from './components/TaskQueue';
 import { SettingsStats } from './components/SettingsStats';
 import { AuthModal } from './components/AuthModal';
+import { ActivityJournal } from './components/ActivityJournal';
 import {
   UserSettings,
   ExamState,
@@ -19,7 +20,8 @@ import {
   DistractionItem,
   DailyTarget,
   DailyStats,
-  UserAuth
+  UserAuth,
+  ActivityLog
 } from './types';
 import {
   auth,
@@ -48,7 +50,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   autoStartBreaks: false,
   autoStartFocus: false,
   enableNotifications: true,
-  notificationLeadMinutes: 5
+  notificationLeadMinutes: 5,
+  strictMode: false
 };
 
 const DEFAULT_DAILY_TARGET: DailyTarget = {
@@ -78,6 +81,7 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [timetables, setTimetables] = useState<TimetableBlock[]>([]);
   const [distractions, setDistractions] = useState<DistractionItem[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<string>('');
   const [dailyTarget, setDailyTarget] = useState<DailyTarget>(DEFAULT_DAILY_TARGET);
   const [todayStats, setTodayStats] = useState<DailyStats>({
@@ -135,6 +139,7 @@ export default function App() {
         if (data.tasks) setTasks(data.tasks);
         if (data.timetables) setTimetables(data.timetables);
         if (data.distractions) setDistractions(data.distractions);
+        if (data.activityLogs) setActivityLogs(data.activityLogs);
         if (data.notes) setNotes(data.notes);
         if (data.dailyTarget) setDailyTarget(data.dailyTarget);
         if (data.todayStats) setTodayStats(data.todayStats);
@@ -248,6 +253,28 @@ export default function App() {
         setTodayStats((prev) => ({ ...prev, distractions: countToday }));
       },
       (err) => console.warn('Firestore distractions snapshot error:', err)
+    );
+
+    return () => unsubscribe();
+  }, [userAuth?.uid, syncCode]);
+
+  // Sync Activity Logs from Firestore
+  useEffect(() => {
+    if (syncCode || !userAuth?.uid) return;
+    const logsRef = collection(db, 'activity_logs');
+    const q = query(logsRef, where('userId', '==', userAuth.uid));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const loaded: ActivityLog[] = [];
+        snapshot.forEach((docSnap) => {
+          loaded.push({ id: docSnap.id, ...docSnap.data() } as ActivityLog);
+        });
+        loaded.sort((a, b) => b.startTime - a.startTime);
+        setActivityLogs(loaded);
+      },
+      (err) => console.warn('Firestore activity_logs snapshot error:', err)
     );
 
     return () => unsubscribe();
@@ -429,6 +456,54 @@ export default function App() {
     [userAuth?.uid, syncCode]
   );
 
+  const handleAddActivityLog = useCallback(
+    async (logData: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'>) => {
+      const newLog = {
+        ...logData,
+        id: Math.random().toString(36).substring(2, 10),
+        userId: userAuth?.uid || 'anonymous',
+        createdAt: Date.now()
+      };
+
+      if (syncCode) {
+        setActivityLogs((prev) => {
+          const next = [newLog, ...prev];
+          updateSyncDoc(syncCode, { activityLogs: next });
+          return next;
+        });
+        return;
+      }
+
+      if (!userAuth?.uid) return;
+      try {
+        await addDoc(collection(db, 'activity_logs'), newLog);
+      } catch (err) {
+        console.warn('Error adding activity log:', err);
+      }
+    },
+    [userAuth?.uid, syncCode]
+  );
+
+  const handleRemoveActivityLog = useCallback(
+    async (id: string) => {
+      if (syncCode) {
+        setActivityLogs((prev) => {
+          const next = prev.filter((l) => l.id !== id);
+          updateSyncDoc(syncCode, { activityLogs: next });
+          return next;
+        });
+        return;
+      }
+
+      try {
+        await deleteDoc(doc(db, 'activity_logs', id));
+      } catch (err) {
+        console.warn('Error deleting activity log:', err);
+      }
+    },
+    [syncCode]
+  );
+
   const handleUpdateIntention = useCallback(
     async (newIntention: string) => {
       setIntention(newIntention);
@@ -565,13 +640,14 @@ export default function App() {
   );
 
   const handleLogDistraction = useCallback(
-    async (text: string, sessionGoal: string) => {
+    async (text: string, sessionGoal: string, durationSeconds?: number) => {
       const newDistraction = {
         id: Math.random().toString(36).substring(2, 10),
         userId: userAuth?.uid || 'anonymous',
         text,
         sessionIntention: sessionGoal,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        ...(durationSeconds !== undefined ? { durationSeconds } : {})
       };
 
       if (syncCode) {
@@ -722,6 +798,14 @@ export default function App() {
             onToggleTask={handleToggleTask}
             onRemoveTask={handleRemoveTask}
             onStartFocusForTask={handleStartFocusForTask}
+          />
+        )}
+
+        {activeTab === 'journal' && (
+          <ActivityJournal
+            logs={activityLogs}
+            onAddLog={handleAddActivityLog}
+            onRemoveLog={handleRemoveActivityLog}
           />
         )}
 

@@ -3,6 +3,7 @@ import { Calendar, CalendarPlus, Download, Plus, Trash2, MapPin, Clock, Bell, Ch
 import { TimetableBlock } from '../types';
 import { createGCalLinkForTimetableBlock, generateICSForTimetable, downloadICSFile } from '../lib/gcal';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
+import { TimePickerInput } from './TimePickerInput';
 
 interface TimetableCalendarProps {
   blocks: TimetableBlock[];
@@ -287,27 +288,18 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-400 mb-1">Start Time</label>
-                  <input
-                    type="time"
-                    required
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-zinc-400 mb-1">End Time</label>
-                  <input
-                    type="time"
-                    required
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-600"
-                  />
-                </div>
+                <TimePickerInput
+                  label="Start Time"
+                  value={startTime}
+                  onChange={setStartTime}
+                  required
+                />
+                <TimePickerInput
+                  label="End Time"
+                  value={endTime}
+                  onChange={setEndTime}
+                  required
+                />
               </div>
 
               <div>

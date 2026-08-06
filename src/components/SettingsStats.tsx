@@ -431,6 +431,21 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                   className="accent-zinc-400"
                 />
               </label>
+
+              <label className="flex items-center justify-between text-zinc-300 cursor-pointer group">
+                <div className="flex flex-col">
+                  <span>Strict Mode</span>
+                  <span className="text-[10px] text-zinc-500 max-w-[200px] leading-tight mt-0.5">
+                    Automatically pauses timer and records distraction if you leave the app while focusing.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.strictMode || false}
+                  onChange={(e) => onUpdateSettings({ ...settings, strictMode: e.target.checked })}
+                  className="accent-rose-500 h-4 w-4"
+                />
+              </label>
             </div>
           </div>
         </section>
