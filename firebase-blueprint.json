@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "User profiles and app settings",
+      "properties": {
+        "uid": { "type": "string" },
+        "isAnonymous": { "type": "boolean" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "settings": { "type": "object" },
+        "dailyTarget": { "type": "object" }
+      },
+      "required": ["uid", "createdAt"]
+    },
+    "timetables": {
+      "title": "Timetable Entries",
+      "description": "Scheduled study blocks across the week",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "dayOfWeek": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "subject": { "type": "string" },
+        "location": { "type": "string" },
+        "color": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "dayOfWeek", "startTime", "endTime"]
+    },
+    "sessions": {
+      "title": "Study Sessions",
+      "description": "Completed or logged study blocks",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "focusMinutes": { "type": "number" },
+        "breakMinutes": { "type": "number" },
+        "completedAt": { "type": "string" },
+        "dateKey": { "type": "string" }
+      },
+      "required": ["userId", "focusMinutes", "completedAt"]
+    },
+    "tasks": {
+      "title": "Daily Tasks",
+      "description": "Tasks to complete for study goals",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "complete": { "type": "boolean" },
+        "dueDate": { "type": "string" },
+        "priority": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "complete"]
+    },
+    "distractions": {
+      "title": "Distraction Logs",
+      "description": "Logged distractions during study blocks",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "text": { "type": "string" },
+        "sessionIntention": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "text", "createdAt"]
+    },
+    "notes": {
+      "title": "Study Quick Notes",
+      "description": "Scratchpad and quick study notes",
+      "properties": {
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId"]
+    }
+  }
+}
