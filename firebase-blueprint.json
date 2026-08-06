@@ -80,6 +80,61 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["userId"]
+    },
+    "daily": {
+      "title": "Daily Aggregated Study Record",
+      "description": "Aggregated daily document storing sessions, distractions, and stats per day to minimize reads",
+      "properties": {
+        "dateKey": { "type": "string" },
+        "userId": { "type": "string" },
+        "updatedAt": { "type": "number" },
+        "stats": { "type": "object" },
+        "sessions": { "type": "array" },
+        "distractions": { "type": "array" }
+      },
+      "required": ["dateKey", "userId"]
+    },
+    "stats": {
+      "title": "Overall Stats Summary",
+      "description": "Single rollup summary document for overall user statistics",
+      "properties": {
+        "userId": { "type": "string" },
+        "totalFocusMinutes": { "type": "number" },
+        "totalSessions": { "type": "number" },
+        "totalDistractions": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "users",
+      "description": "User account settings and profile"
+    },
+    "users/{userId}/daily/{dateKey}": {
+      "schema": "daily",
+      "description": "Daily aggregated sessions and distractions"
+    },
+    "users/{userId}/stats/summary": {
+      "schema": "stats",
+      "description": "Overall stats rollup summary"
+    },
+    "tasks/{taskId}": {
+      "schema": "tasks",
+      "description": "User tasks"
+    },
+    "timetables/{blockId}": {
+      "schema": "timetables",
+      "description": "User scheduled timetable blocks"
+    },
+    "notes/{userId}": {
+      "schema": "notes",
+      "description": "User study notes"
+    },
+    "activity_logs/{logId}": {
+      "schema": "sessions",
+      "description": "Activity journal logs"
     }
   }
 }
