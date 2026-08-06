@@ -9,9 +9,9 @@ import {
   User
 } from 'firebase/auth';
 import {
-  getFirestore,
-  enableMultiTabIndexedDbPersistence,
-  enableIndexedDbPersistence,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc,
   setDoc,
   getDoc,
@@ -31,23 +31,17 @@ const app = initializeApp(firebaseConfigData);
 // Initialize Auth
 export const auth = getAuth(app);
 
-// Initialize Firestore with specific database ID if available
+// Initialize Firestore with specific database ID if available and modern multi-tab persistence
 const dbId = firebaseConfigData.firestoreDatabaseId || undefined;
-export const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+const settings = {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+};
 
-// Enable offline persistence for seamless study sessions without internet connection
-if (typeof window !== 'undefined') {
-  enableMultiTabIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      // Multiple tabs open, fallback to single tab persistence
-      enableIndexedDbPersistence(db).catch(() => {
-        console.warn('Firestore offline persistence disabled');
-      });
-    } else if (err.code === 'unimplemented') {
-      console.warn('Browser does not support offline persistence');
-    }
-  });
-}
+export const db = dbId
+  ? initializeFirestore(app, settings, dbId)
+  : initializeFirestore(app, settings);
 
 // Helper to get or create persistent guest UID
 export const getOrGenerateLocalGuestUid = (): string => {
