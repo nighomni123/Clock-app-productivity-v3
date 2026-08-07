@@ -80,18 +80,18 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
   return (
     <div className="mx-auto w-full max-w-7xl animate-in fade-in zoom-in-95 duration-500">
       {/* Header Banner & Google Calendar Actions */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm">
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-3 sm:gap-4 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
         <div>
           <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-indigo-400" />
-            <h1 className="text-xl font-semibold text-zinc-100">Study Session Timetable</h1>
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400 shrink-0" />
+            <h1 className="text-lg sm:text-xl font-semibold text-zinc-100">Study Session Timetable</h1>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
             Schedule recurring weekly study blocks, sync push notifications, and export to Google Calendar.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Web Notification status pill */}
           {notifStatus === 'granted' ? (
             <div className="flex items-center gap-1.5 rounded-full border border-emerald-900/40 bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-400">
@@ -112,7 +112,7 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
           <button
             onClick={handleExportICS}
             disabled={!blocks.length}
-            className="flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-4 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-700 disabled:opacity-50"
             title="Export timetable to iCalendar (.ics) for Google Calendar / Apple Calendar"
           >
             <Download className="h-3.5 w-3.5" />
@@ -122,16 +122,16 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
           {/* Add Study Block button */}
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-1.5 text-xs font-medium text-zinc-950 shadow transition hover:bg-white"
+            className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3.5 py-1.5 text-xs font-medium text-zinc-950 shadow transition hover:bg-white"
           >
             <Plus className="h-4 w-4" />
-            <span>Add Study Block</span>
+            <span>Add Block</span>
           </button>
         </div>
       </div>
 
-      {/* Day Selector Tabs */}
-      <div className="mb-6 flex items-center gap-1 overflow-x-auto rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-1.5 backdrop-blur-sm">
+      {/* Day Selector Tabs - Responsive & Smooth Horizontal Scroll */}
+      <div className="mb-4 sm:mb-6 flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-1 sm:p-1.5 backdrop-blur-sm">
         {DAYS_OF_WEEK.map((day) => {
           const count = blocks.filter((b) => b.dayOfWeek === day).length;
           const isSelected = selectedDay === day;
@@ -139,7 +139,7 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
             <button
               key={day}
               onClick={() => setSelectedDay(day)}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-medium transition ${
+              className={`flex shrink-0 sm:flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-1.5 sm:py-2 px-2.5 sm:px-3 text-xs font-medium transition ${
                 isSelected
                   ? 'bg-zinc-100 text-zinc-950 shadow-sm'
                   : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
@@ -161,12 +161,12 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
       </div>
 
       {/* Timetable Blocks Grid for Selected Day */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredBlocks.length === 0 ? (
-          <div className="col-span-full rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/30 p-12 text-center">
-            <Calendar className="mx-auto h-10 w-10 text-zinc-600 mb-3" />
-            <h3 className="text-sm font-medium text-zinc-400">No study blocks scheduled for {selectedDay}</h3>
-            <p className="text-xs text-zinc-600 mt-1">Click "Add Study Block" to build your weekly timetable.</p>
+          <div className="col-span-full rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/30 p-8 sm:p-12 text-center">
+            <Calendar className="mx-auto h-8 w-8 sm:h-10 sm:w-10 text-zinc-600 mb-2 sm:mb-3" />
+            <h3 className="text-xs sm:text-sm font-medium text-zinc-400">No study blocks scheduled for {selectedDay}</h3>
+            <p className="text-[11px] sm:text-xs text-zinc-600 mt-1">Click "Add Block" to build your weekly timetable.</p>
           </div>
         ) : (
           filteredBlocks.map((block) => {
@@ -176,7 +176,7 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
             return (
               <div
                 key={block.id}
-                className={`relative flex flex-col justify-between rounded-3xl border p-5 backdrop-blur-sm transition hover:border-zinc-600 ${colorMatch.bgClass}`}
+                className={`relative flex flex-col justify-between rounded-3xl border p-4 sm:p-5 backdrop-blur-sm transition hover:border-zinc-600 ${colorMatch.bgClass}`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
@@ -184,7 +184,7 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                         {block.subject}
                       </span>
-                      <h3 className="text-base font-semibold text-zinc-100 mt-0.5">{block.title}</h3>
+                      <h3 className="text-sm sm:text-base font-semibold text-zinc-100 mt-0.5">{block.title}</h3>
                     </div>
                     <button
                       onClick={() => onRemoveBlock(block.id)}
@@ -195,7 +195,7 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
                     </button>
                   </div>
 
-                  <div className="mt-4 space-y-1.5 text-xs text-zinc-300">
+                  <div className="mt-3 sm:mt-4 space-y-1.5 text-xs text-zinc-300">
                     <div className="flex items-center gap-2">
                       <Clock className="h-3.5 w-3.5 text-zinc-400" />
                       <span className="tabular-nums font-mono">
@@ -211,7 +211,7 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-5 border-t border-zinc-800/60 pt-3 flex items-center justify-between">
+                <div className="mt-4 sm:mt-5 border-t border-zinc-800/60 pt-3 flex items-center justify-between">
                   <a
                     href={gcalUrl}
                     target="_blank"
@@ -219,9 +219,9 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
                     className="flex items-center gap-1.5 text-xs font-medium text-indigo-300 hover:text-indigo-200 transition"
                   >
                     <CalendarPlus className="h-3.5 w-3.5" />
-                    <span>Sync to Google Calendar</span>
+                    <span>Google Calendar</span>
                   </a>
-                  <span className="text-[10px] text-zinc-500">Weekly Recurring</span>
+                  <span className="text-[10px] text-zinc-500">Weekly</span>
                 </div>
               </div>
             );
@@ -231,8 +231,8 @@ export const TimetableCalendar: React.FC<TimetableCalendarProps> = ({
 
       {/* Add Study Block Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
             <h2 className="text-lg font-semibold text-zinc-100 mb-4">Add Study Block</h2>
 
             <form onSubmit={handleCreateBlockSubmit} className="space-y-4 text-xs">

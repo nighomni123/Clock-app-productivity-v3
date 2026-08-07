@@ -212,10 +212,10 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
     <div className="mx-auto max-w-7xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Top Header & Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-zinc-800 pb-4 sm:pb-5">
         <div>
-          <h1 className="text-2xl font-light tracking-tight text-white flex items-center gap-2.5">
-            <Activity className="h-6 w-6 text-emerald-400" />
+          <h1 className="text-xl sm:text-2xl font-light tracking-tight text-white flex items-center gap-2 sm:gap-2.5">
+            <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 shrink-0" />
             Activity Journal & Weekly Calendar
           </h1>
           <p className="text-zinc-400 text-xs mt-1">
@@ -223,7 +223,7 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Navigation Controls */}
           <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
             <button
@@ -235,7 +235,7 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
             </button>
             <button
               onClick={handleResetToday}
-              className="px-3 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-950/40 rounded-lg transition"
+              className="px-2.5 sm:px-3 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-950/40 rounded-lg transition"
             >
               Today
             </button>
@@ -251,7 +251,7 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
           {/* Quick Action Buttons */}
           <button
             onClick={() => handleOpenModal(new Date(), new Date().getHours(), Math.floor(new Date().getMinutes() / 30) * 30)}
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-2 text-xs font-medium hover:bg-emerald-500/20 transition"
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 sm:py-2 text-xs font-medium hover:bg-emerald-500/20 transition"
           >
             <Plus className="h-4 w-4" />
             Log Activity
@@ -259,7 +259,7 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
 
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 rounded-xl bg-zinc-900 text-zinc-300 border border-zinc-800 px-3 py-2 text-xs font-medium hover:bg-zinc-800 transition"
+            className="flex items-center gap-1.5 rounded-xl bg-zinc-900 text-zinc-300 border border-zinc-800 px-3 py-1.5 sm:py-2 text-xs font-medium hover:bg-zinc-800 transition"
           >
             <Download className="h-4 w-4" />
             Export
@@ -268,244 +268,247 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
       </div>
 
       {/* Analytics Summary Pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3.5 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-950/50 text-emerald-400 border border-emerald-900/50">
-            <Clock className="h-5 w-5" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
+          <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-950/50 text-emerald-400 border border-emerald-900/50 shrink-0">
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
-          <div>
-            <span className="text-xs text-zinc-400 block">Total Hours</span>
-            <span className="text-lg font-semibold text-zinc-100">
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Total Hours</span>
+            <span className="text-base sm:text-lg font-semibold text-zinc-100">
               {Math.floor(totalLoggedMinutes / 60)}h {Math.round(totalLoggedMinutes % 60)}m
             </span>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3.5 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-amber-950/50 text-amber-400 border border-amber-900/50">
-            <Star className="h-5 w-5 fill-amber-400/20" />
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
+          <div className="p-2 sm:p-2.5 rounded-xl bg-amber-950/50 text-amber-400 border border-amber-900/50 shrink-0">
+            <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-amber-400/20" />
           </div>
-          <div>
-            <span className="text-xs text-zinc-400 block">Avg Rating</span>
-            <span className="text-lg font-semibold text-zinc-100">{avgRating} / 5.0</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3.5 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-950/50 text-indigo-400 border border-indigo-900/50">
-            <Activity className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="text-xs text-zinc-400 block">Logged Entries</span>
-            <span className="text-lg font-semibold text-zinc-100">{logs.length}</span>
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Avg Rating</span>
+            <span className="text-base sm:text-lg font-semibold text-zinc-100">{avgRating} / 5.0</span>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3.5 flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-purple-950/50 text-purple-400 border border-purple-900/50">
-            <CalendarIcon className="h-5 w-5" />
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
+          <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-950/50 text-indigo-400 border border-indigo-900/50 shrink-0">
+            <Activity className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
-          <div>
-            <span className="text-xs text-zinc-400 block">Active Days</span>
-            <span className="text-lg font-semibold text-zinc-100">
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Logged Entries</span>
+            <span className="text-base sm:text-lg font-semibold text-zinc-100">{logs.length}</span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
+          <div className="p-2 sm:p-2.5 rounded-xl bg-purple-950/50 text-purple-400 border border-purple-900/50 shrink-0">
+            <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Active Days</span>
+            <span className="text-base sm:text-lg font-semibold text-zinc-100">
               {new Set(logs.map(l => new Date(l.startTime).toDateString())).size} days
             </span>
           </div>
         </div>
       </div>
 
-      {/* Main Weekly Calendar Grid Container */}
+      {/* Main Weekly Calendar Grid Container with Horizontal Scroll on Mobile */}
       <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950 overflow-hidden shadow-2xl flex flex-col">
-        
-        {/* Sticky Calendar Days Header */}
-        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-zinc-800/80 bg-zinc-900/90 backdrop-blur-md z-20 sticky top-0">
-          <div className="p-3 border-r border-zinc-800/60 flex items-center justify-center text-[10px] uppercase tracking-wider text-zinc-500 font-mono">
-            GMT
-          </div>
-
-          {days.map((d, index) => {
-            const dayLogs = getLogsForDay(d);
-            const hasGap = dayLogs.length === 0;
-            const today = isToday(d);
-
-            return (
-              <div
-                key={d.toISOString()}
-                className={`p-3 text-center border-r border-zinc-800/60 relative ${
-                  today ? 'bg-emerald-950/20' : ''
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1.5 mb-0.5">
-                  <span className={`text-xs font-medium ${today ? 'text-emerald-400 font-bold' : 'text-zinc-400'}`}>
-                    {d.toLocaleDateString([], { weekday: 'short' })}
-                  </span>
-                  {today && (
-                    <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-500/30 uppercase tracking-wider">
-                      Today
-                    </span>
-                  )}
-                </div>
-
-                <div className="text-sm font-semibold text-zinc-200">
-                  {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                </div>
-
-                {/* Gap Indicator or Entry Count */}
-                {hasGap ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-400/90 bg-amber-950/40 border border-amber-900/50 px-1.5 py-0.5 rounded-full mt-1">
-                    <AlertCircle className="h-2.5 w-2.5" /> Gap (No logs)
-                  </span>
-                ) : (
-                  <span className="inline-block text-[10px] text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded-full mt-1">
-                    {dayLogs.length} {dayLogs.length === 1 ? 'entry' : 'entries'}
-                  </span>
-                )}
+        <div className="overflow-x-auto no-scrollbar scroll-smooth">
+          <div className="min-w-[720px] flex flex-col">
+            {/* Sticky Calendar Days Header */}
+            <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-zinc-800/80 bg-zinc-900/90 backdrop-blur-md z-20 sticky top-0">
+              <div className="p-3 border-r border-zinc-800/60 flex items-center justify-center text-[10px] uppercase tracking-wider text-zinc-500 font-mono">
+                GMT
               </div>
-            );
-          })}
-        </div>
 
-        {/* Scrollable Time Timeline Grid (1 hour = 60px height) */}
-        <div
-          ref={scrollContainerRef}
-          className="overflow-y-auto max-h-[650px] relative divide-y divide-zinc-900/80 select-none [color-scheme:dark]"
-        >
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] relative min-h-[1440px]">
-            
-            {/* Time labels column */}
-            <div className="border-r border-zinc-800/60 bg-zinc-950/80 relative text-zinc-500 text-[11px] font-mono">
-              {Array.from({ length: 24 }).map((_, h) => (
-                <div
-                  key={h}
-                  style={{ top: `${h * 60}px` }}
-                  className="absolute left-0 right-0 h-[60px] border-b border-zinc-900/50 pr-2 pt-1 text-right"
-                >
-                  {String(h).padStart(2, '0')}:00
-                </div>
-              ))}
+              {days.map((d, index) => {
+                const dayLogs = getLogsForDay(d);
+                const hasGap = dayLogs.length === 0;
+                const today = isToday(d);
+
+                return (
+                  <div
+                    key={d.toISOString()}
+                    className={`p-3 text-center border-r border-zinc-800/60 relative ${
+                      today ? 'bg-emerald-950/20' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                      <span className={`text-xs font-medium ${today ? 'text-emerald-400 font-bold' : 'text-zinc-400'}`}>
+                        {d.toLocaleDateString([], { weekday: 'short' })}
+                      </span>
+                      {today && (
+                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-500/30 uppercase tracking-wider">
+                          Today
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-sm font-semibold text-zinc-200">
+                      {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    </div>
+
+                    {/* Gap Indicator or Entry Count */}
+                    {hasGap ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-400/90 bg-amber-950/40 border border-amber-900/50 px-1.5 py-0.5 rounded-full mt-1">
+                        <AlertCircle className="h-2.5 w-2.5" /> Gap (No logs)
+                      </span>
+                    ) : (
+                      <span className="inline-block text-[10px] text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded-full mt-1">
+                        {dayLogs.length} {dayLogs.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* 7 Day Columns */}
-            {days.map((dayDate, dayIdx) => {
-              const dayLogs = getLogsForDay(dayDate);
-              const today = isToday(dayDate);
-
-              return (
-                <div
-                  key={dayDate.toISOString()}
-                  className={`relative border-r border-zinc-800/40 min-h-[1440px] ${
-                    today ? 'bg-emerald-950/5' : ''
-                  }`}
-                >
-                  {/* Grid Lines for 24 Hours & 30 Min slots */}
+            {/* Scrollable Time Timeline Grid (1 hour = 60px height) */}
+            <div
+              ref={scrollContainerRef}
+              className="overflow-y-auto max-h-[600px] relative divide-y divide-zinc-900/80 select-none [color-scheme:dark]"
+            >
+              <div className="grid grid-cols-[60px_repeat(7,1fr)] relative min-h-[1440px]">
+                
+                {/* Time labels column */}
+                <div className="border-r border-zinc-800/60 bg-zinc-950/80 relative text-zinc-500 text-[11px] font-mono">
                   {Array.from({ length: 24 }).map((_, h) => (
-                    <React.Fragment key={h}>
-                      {/* 00 min slot hitbox */}
-                      <div
-                        onClick={() => handleOpenModal(dayDate, h, 0)}
-                        style={{ top: `${h * 60}px`, height: '30px' }}
-                        className="absolute left-0 right-0 border-b border-zinc-900/40 hover:bg-emerald-500/10 cursor-pointer transition-colors group flex items-center justify-center"
-                      >
-                        <span className="opacity-0 group-hover:opacity-100 text-[10px] text-emerald-400/90 bg-black/80 px-1.5 py-0.5 rounded border border-emerald-500/30">
-                          + {String(h).padStart(2, '0')}:00
-                        </span>
-                      </div>
-
-                      {/* 30 min slot hitbox */}
-                      <div
-                        onClick={() => handleOpenModal(dayDate, h, 30)}
-                        style={{ top: `${h * 60 + 30}px`, height: '30px' }}
-                        className="absolute left-0 right-0 border-b border-zinc-900/80 hover:bg-emerald-500/10 cursor-pointer transition-colors group flex items-center justify-center border-dashed"
-                      >
-                        <span className="opacity-0 group-hover:opacity-100 text-[10px] text-emerald-400/90 bg-black/80 px-1.5 py-0.5 rounded border border-emerald-500/30">
-                          + {String(h).padStart(2, '0')}:30
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  ))}
-
-                  {/* Empty Day Background Gap Banner */}
-                  {dayLogs.length === 0 && (
-                    <div className="absolute inset-x-2 top-24 bottom-24 rounded-2xl border border-dashed border-zinc-800/60 bg-zinc-950/40 pointer-events-none flex flex-col items-center justify-center p-4 text-center">
-                      <AlertCircle className="h-5 w-5 text-zinc-600 mb-1.5" />
-                      <span className="text-xs text-zinc-500 font-medium">Gap Day</span>
-                      <span className="text-[10px] text-zinc-600 mt-1">No activities logged</span>
-                    </div>
-                  )}
-
-                  {/* Activity Log Blocks */}
-                  {dayLogs.map((log) => {
-                    const startObj = new Date(log.startTime);
-                    const endObj = new Date(log.endTime);
-
-                    const startMin = startObj.getHours() * 60 + startObj.getMinutes();
-                    const endMin = endObj.getHours() * 60 + endObj.getMinutes();
-                    const durationMin = Math.max(15, endMin - startMin);
-
-                    const topPx = startMin; // 1 min = 1 px
-                    const heightPx = Math.max(26, durationMin); // min height 26px
-
-                    const style = CATEGORY_STYLES[log.category] || CATEGORY_STYLES['Other'];
-
-                    return (
-                      <div
-                        key={log.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedLog(log);
-                        }}
-                        style={{
-                          top: `${topPx}px`,
-                          height: `${heightPx}px`
-                        }}
-                        className={`absolute inset-x-1 z-10 rounded-xl border p-2 shadow-md hover:z-20 hover:scale-[1.02] cursor-pointer transition-all flex flex-col justify-between overflow-hidden ${style.bg} ${style.border} ${style.text}`}
-                      >
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="text-xs font-semibold truncate leading-tight">
-                            {log.title}
-                          </span>
-                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-medium shrink-0 ${style.badge}`}>
-                            {log.category}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[10px] opacity-80 mt-1">
-                          <span>
-                            {startObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
-                            {endObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="flex items-center gap-0.5 text-amber-400">
-                            ★ {log.rating}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Current Time Indicator Line if Today */}
-                  {today && (
                     <div
-                      style={{
-                        top: `${new Date().getHours() * 60 + new Date().getMinutes()}px`
-                      }}
-                      className="absolute inset-x-0 border-t-2 border-emerald-400 z-30 pointer-events-none flex items-center"
+                      key={h}
+                      style={{ top: `${h * 60}px` }}
+                      className="absolute left-0 right-0 h-[60px] border-b border-zinc-900/50 pr-2 pt-1 text-right"
                     >
-                      <div className="w-2 h-2 rounded-full bg-emerald-400 -ml-1 shadow-sm shadow-emerald-400" />
+                      {String(h).padStart(2, '0')}:00
                     </div>
-                  )}
-
+                  ))}
                 </div>
-              );
-            })}
 
+                {/* 7 Day Columns */}
+                {days.map((dayDate, dayIdx) => {
+                  const dayLogs = getLogsForDay(dayDate);
+                  const today = isToday(dayDate);
+
+                  return (
+                    <div
+                      key={dayDate.toISOString()}
+                      className={`relative border-r border-zinc-800/40 min-h-[1440px] ${
+                        today ? 'bg-emerald-950/5' : ''
+                      }`}
+                    >
+                      {/* Grid Lines for 24 Hours & 30 Min slots */}
+                      {Array.from({ length: 24 }).map((_, h) => (
+                        <React.Fragment key={h}>
+                          {/* 00 min slot hitbox */}
+                          <div
+                            onClick={() => handleOpenModal(dayDate, h, 0)}
+                            style={{ top: `${h * 60}px`, height: '30px' }}
+                            className="absolute left-0 right-0 border-b border-zinc-900/40 hover:bg-emerald-500/10 cursor-pointer transition-colors group flex items-center justify-center"
+                          >
+                            <span className="opacity-0 group-hover:opacity-100 text-[10px] text-emerald-400/90 bg-black/80 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                              + {String(h).padStart(2, '0')}:00
+                            </span>
+                          </div>
+
+                          {/* 30 min slot hitbox */}
+                          <div
+                            onClick={() => handleOpenModal(dayDate, h, 30)}
+                            style={{ top: `${h * 60 + 30}px`, height: '30px' }}
+                            className="absolute left-0 right-0 border-b border-zinc-900/80 hover:bg-emerald-500/10 cursor-pointer transition-colors group flex items-center justify-center border-dashed"
+                          >
+                            <span className="opacity-0 group-hover:opacity-100 text-[10px] text-emerald-400/90 bg-black/80 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                              + {String(h).padStart(2, '0')}:30
+                            </span>
+                          </div>
+                        </React.Fragment>
+                      ))}
+
+                      {/* Empty Day Background Gap Banner */}
+                      {dayLogs.length === 0 && (
+                        <div className="absolute inset-x-2 top-24 bottom-24 rounded-2xl border border-dashed border-zinc-800/60 bg-zinc-950/40 pointer-events-none flex flex-col items-center justify-center p-4 text-center">
+                          <AlertCircle className="h-5 w-5 text-zinc-600 mb-1.5" />
+                          <span className="text-xs text-zinc-500 font-medium">Gap Day</span>
+                          <span className="text-[10px] text-zinc-600 mt-1">No activities logged</span>
+                        </div>
+                      )}
+
+                      {/* Activity Log Blocks */}
+                      {dayLogs.map((log) => {
+                        const startObj = new Date(log.startTime);
+                        const endObj = new Date(log.endTime);
+
+                        const startMin = startObj.getHours() * 60 + startObj.getMinutes();
+                        const endMin = endObj.getHours() * 60 + endObj.getMinutes();
+                        const durationMin = Math.max(15, endMin - startMin);
+
+                        const topPx = startMin; // 1 min = 1 px
+                        const heightPx = Math.max(26, durationMin); // min height 26px
+
+                        const style = CATEGORY_STYLES[log.category] || CATEGORY_STYLES['Other'];
+
+                        return (
+                          <div
+                            key={log.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLog(log);
+                            }}
+                            style={{
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`
+                            }}
+                            className={`absolute inset-x-1 z-10 rounded-xl border p-2 shadow-md hover:z-20 hover:scale-[1.02] cursor-pointer transition-all flex flex-col justify-between overflow-hidden ${style.bg} ${style.border} ${style.text}`}
+                          >
+                            <div className="flex items-start justify-between gap-1">
+                              <span className="text-xs font-semibold truncate leading-tight">
+                                {log.title}
+                              </span>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-medium shrink-0 ${style.badge}`}>
+                                {log.category}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] opacity-80 mt-1">
+                              <span>
+                                {startObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
+                                {endObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <span className="flex items-center gap-0.5 text-amber-400">
+                                ★ {log.rating}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Current Time Indicator Line if Today */}
+                      {today && (
+                        <div
+                          style={{
+                            top: `${new Date().getHours() * 60 + new Date().getMinutes()}px`
+                          }}
+                          className="absolute inset-x-0 border-t-2 border-emerald-400 z-30 pointer-events-none flex items-center"
+                        >
+                          <div className="w-2 h-2 rounded-full bg-emerald-400 -ml-1 shadow-sm shadow-emerald-400" />
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })}
+
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Dialog / Modal for Logging Activity */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto no-scrollbar">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h2 className="text-lg font-medium text-zinc-100 flex items-center gap-2">
                 <Plus className="h-5 w-5 text-emerald-400" />

@@ -52,6 +52,8 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [distractionInput, setDistractionInput] = useState('');
   const [focusFullscreen, setFocusFullscreen] = useState(false);
+  const [showFsDistractionModal, setShowFsDistractionModal] = useState(false);
+  const [fsDistractionInput, setFsDistractionInput] = useState('');
 
   const endTimeRef = useRef(0);
   const completionLockRef = useRef(false);
@@ -248,7 +250,11 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
         resetTimer();
       } else if (e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        handleLogDistractionSubmit('Quick Distraction logged via key shortcut');
+        if (focusFullscreen) {
+          setShowFsDistractionModal((prev) => !prev);
+        } else {
+          handleLogDistractionSubmit('Quick Distraction logged via key shortcut');
+        }
       } else if (e.key.toLowerCase() === 'n') {
         e.preventDefault();
         document.getElementById('quick-notes-textarea')?.focus();
@@ -267,17 +273,201 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const progress = sessionDuration ? ((sessionDuration - timeLeft) / sessionDuration) * 100 : 0;
   const activeLabel = mode === 'focus' ? 'Focus Block' : mode === 'longBreak' ? 'Long Break' : 'Short Break';
 
+  if (focusFullscreen) {
+    return (
+      <div className="fixed inset-0 z-[9999] h-screen w-screen flex flex-col items-center justify-between bg-zinc-950 p-2 sm:p-4 md:p-6 text-zinc-100 select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        {/* Ambient Progress Fill */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 bg-zinc-900/50 transition-all duration-500 ease-linear"
+          style={{ height: `${progress}%` }}
+        />
+
+        {/* Top Header */}
+        <div className="relative z-20 flex w-full max-w-6xl items-center justify-between gap-1.5 sm:gap-2 shrink-0 py-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.15em] sm:tracking-[0.25em] text-zinc-400">
+              {activeLabel}
+            </span>
+            <span className="text-[10px] sm:text-xs text-zinc-600 font-mono">({Math.round(progress)}%)</span>
+          </div>
+
+          <div className="flex rounded-full border border-zinc-800/80 bg-zinc-900/90 p-0.5 backdrop-blur-md">
+            {[
+              ['focus', 'Focus'],
+              ['break', 'Break'],
+              ['longBreak', 'Long Break']
+            ].map(([mKey, label]) => (
+              <button
+                key={mKey}
+                onClick={() => setTimerMode(mKey as 'focus' | 'break' | 'longBreak')}
+                className={`rounded-full px-2 sm:px-4 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium transition ${
+                  mode === mKey
+                    ? 'bg-zinc-100 text-zinc-950 shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            id="exit-fullscreen-btn"
+            onClick={toggleFullscreenMode}
+            className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/80 px-2.5 sm:px-3.5 py-1 text-[10px] sm:text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-white backdrop-blur-md shrink-0"
+            title="Exit Fullscreen (ESC or F)"
+          >
+            <Minimize2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="hidden sm:inline">Exit</span>
+            <kbd className="hidden sm:inline-block rounded bg-zinc-800 px-1 py-0.5 text-[9px] text-zinc-400 border border-zinc-700/60">ESC</kbd>
+          </button>
+        </div>
+
+        {/* Strict Mode Alert Overlay */}
+        {strictAlert && (
+          <div className="relative z-30 animate-in slide-in-from-top-4 fade-in duration-300 my-0.5 shrink-0">
+            <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 px-3 py-1 sm:py-1.5 rounded-xl backdrop-blur-md shadow-2xl flex items-center gap-2 text-[11px] sm:text-xs">
+              <AlertTriangle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
+              <span className="font-medium">Strict Mode Triggered!</span>
+              <span className="text-[9px] sm:text-[10px] bg-rose-950/60 px-1.5 py-0.2 rounded text-rose-300 border border-rose-900/50">
+                {strictAlert.durationSeconds > 60 ? `${Math.round(strictAlert.durationSeconds / 60)}m` : `${strictAlert.durationSeconds}s`} recorded
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Main Center Section - Vertically Centered Clock with Controls BELOW the clock */}
+        <div className="relative z-20 flex w-full max-w-3xl flex-1 min-h-0 flex-col items-center justify-center my-auto py-1">
+          <div className="flex flex-col items-center justify-center w-full my-auto">
+            
+            {/* Session Intention Goal (Above Clock) */}
+            <div className="px-2 max-w-md sm:max-w-xl text-center">
+              {intention ? (
+                <>
+                  <p className="text-[8px] sm:text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500 mb-0.5">Session Goal</p>
+                  <h2 className="text-xs sm:text-base md:text-lg font-light text-zinc-100 leading-snug line-clamp-1">
+                    {intention}
+                  </h2>
+                </>
+              ) : (
+                <p className="text-[10px] sm:text-xs text-zinc-600 italic">No goal set for this session</p>
+              )}
+            </div>
+
+            {/* Display Clock - Centered along Y axis, sized dynamically with clamp */}
+            <div className="my-1 sm:my-2 font-extralight tracking-tighter tabular-nums text-zinc-100 font-mono text-[clamp(3.5rem,20vh,11rem)] leading-none drop-shadow-[0_10px_35px_rgba(0,0,0,0.8)] text-center">
+              {formatClock(timeLeft)}
+            </div>
+
+            {/* Controls & Progress Column - Always Stacked BELOW the Clock */}
+            <div className="flex flex-col items-center justify-center w-full max-w-xs sm:max-w-sm shrink-0 mt-1 sm:mt-2">
+              {/* Minimal Progress Bar */}
+              <div className="w-full h-1 sm:h-1.5 bg-zinc-900 rounded-full overflow-hidden my-1 border border-zinc-800/60">
+                <div
+                  className="h-full bg-zinc-200 transition-all duration-300 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {/* Controls Below Clock */}
+              <div className="flex items-center justify-center gap-2.5 sm:gap-4 my-1">
+                <button
+                  id="fs-timer-play-pause-btn"
+                  onClick={toggleTimer}
+                  className="flex h-11 w-11 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:scale-105 active:scale-95 hover:bg-white shadow-2xl shrink-0"
+                  title="Start or Pause (Space)"
+                >
+                  {isRunning ? <Pause className="h-5 w-5 sm:h-7 sm:w-7" /> : <Play className="h-5 w-5 sm:h-7 sm:w-7 ml-0.5" />}
+                </button>
+                <button
+                  id="fs-timer-reset-btn"
+                  onClick={resetTimer}
+                  className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900/90 text-zinc-300 transition hover:border-zinc-700 hover:text-white hover:bg-zinc-800 shrink-0"
+                  title="Reset Session (R)"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+                </button>
+                <button
+                  id="fs-timer-distraction-btn"
+                  onClick={() => setShowFsDistractionModal((prev) => !prev)}
+                  className={`flex h-9 sm:h-12 items-center gap-1.5 rounded-full border px-3 sm:px-5 text-xs font-medium transition backdrop-blur-md shrink-0 ${
+                    showFsDistractionModal
+                      ? 'border-amber-500 bg-amber-500/20 text-amber-200'
+                      : 'border-amber-900/40 bg-amber-950/30 text-amber-300 hover:bg-amber-950/60'
+                  }`}
+                  title="Log Distraction (D)"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Log Distraction</span>
+                  <span className="sm:hidden">Log</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Floating Modal for Distraction Log (Doesn't affect page layout or height) */}
+        {showFsDistractionModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!fsDistractionInput.trim()) return;
+                onLogDistraction(fsDistractionInput.trim(), intention || 'General Study');
+                setFsDistractionInput('');
+                setShowFsDistractionModal(false);
+              }}
+              className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-amber-900/60 bg-zinc-900 p-4 shadow-2xl animate-in zoom-in-95 duration-200"
+            >
+              <div className="flex items-center gap-2 text-amber-400">
+                <AlertTriangle className="h-4 w-4" />
+                <h3 className="text-xs font-semibold text-zinc-100">Log Distraction</h3>
+              </div>
+              <input
+                type="text"
+                autoFocus
+                value={fsDistractionInput}
+                onChange={(e) => setFsDistractionInput(e.target.value)}
+                placeholder="What distracted you? (Press Enter)"
+                className="w-full rounded-xl bg-black/70 px-3 py-2 text-xs text-amber-100 placeholder-amber-500/50 outline-none border border-amber-900/40 focus:border-amber-500"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFsDistractionModal(false)}
+                  className="rounded-xl px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-amber-400 transition"
+                >
+                  Log
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Bottom Shortcut Hints */}
+        <div className="relative z-20 flex flex-wrap justify-center gap-1.5 sm:gap-3 text-[9px] sm:text-[11px] text-zinc-500 shrink-0 py-0.5">
+          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">Space: Play/Pause</span>
+          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">R: Reset</span>
+          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">D: Distraction</span>
+          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">ESC or F: Exit</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl animate-in fade-in zoom-in-95 duration-500">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
         {/* Timer Canvas Panel */}
-        <div
-          className={`relative flex flex-col items-center justify-center overflow-hidden transition-all duration-700 ${
-            focusFullscreen
-              ? 'fixed inset-0 z-[100] bg-black px-6 py-10'
-              : 'min-h-[480px] rounded-3xl border border-zinc-800/80 bg-zinc-900/45 p-8 h-full backdrop-blur-sm'
-          }`}
-        >
+        <div className="relative flex flex-col items-center justify-center overflow-hidden min-h-[480px] rounded-3xl border border-zinc-800/80 bg-zinc-900/45 p-8 h-full backdrop-blur-sm">
           {/* Strict Mode Alert Overlay */}
           {strictAlert && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">

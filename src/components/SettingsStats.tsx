@@ -80,16 +80,16 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
   );
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Account & Firestore Sync Banner */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm flex flex-wrap items-center justify-between gap-4">
+      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-zinc-800 border border-zinc-700 text-zinc-100">
-            <User className="h-5 w-5" />
+          <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-zinc-800 border border-zinc-700 text-zinc-100 shrink-0">
+            <User className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-zinc-100">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-semibold text-sm sm:text-base text-zinc-100">
                 {userAuth
                   ? userAuth.isAnonymous
                     ? 'Anonymous Session'
@@ -100,7 +100,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                 {userAuth?.isAnonymous ? 'Guest ID: ' + userAuth.uid.slice(0, 6) : 'Synced Account'}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-zinc-400">
+            <p className="mt-0.5 text-[11px] sm:text-xs text-zinc-400">
               {userAuth?.isAnonymous
                 ? 'Sign in with Google to persist study sessions across mobile, desktop, and other devices.'
                 : 'Data is synced live to your private Firestore database.'}
@@ -110,28 +110,28 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
 
         <button
           onClick={onOpenAuth}
-          className="rounded-xl bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-white shadow"
+          className="rounded-xl bg-zinc-100 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-zinc-950 transition hover:bg-white shadow shrink-0"
         >
           {userAuth?.isAnonymous ? 'Link Google Account' : 'Account Details'}
         </button>
       </section>
 
       {/* Device Pairing & Sync Code */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm">
-        <div className="mb-6 flex items-center justify-between">
+      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
+        <div className="mb-4 sm:mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Key className="h-5 w-5 text-emerald-400" />
-            <h2 className="font-semibold text-zinc-200">Device Pairing & Sync Code</h2>
+            <Key className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+            <h2 className="font-semibold text-sm sm:text-base text-zinc-200">Device Pairing & Sync Code</h2>
           </div>
-          <span className="text-xs text-zinc-500">Sync data without an account</span>
+          <span className="text-[10px] sm:text-xs text-zinc-500 hidden sm:inline">Sync data without an account</span>
         </div>
 
         {syncCode ? (
-          <div className="rounded-2xl border border-emerald-900/50 bg-emerald-950/20 p-5 space-y-4">
+          <div className="rounded-2xl border border-emerald-900/50 bg-emerald-950/20 p-4 sm:p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-medium text-emerald-300">Sync is Active</h3>
-                <p className="text-xs text-emerald-500/70">Your data is synced live to this code</p>
+                <h3 className="font-medium text-xs sm:text-sm text-emerald-300">Sync is Active</h3>
+                <p className="text-[10px] sm:text-xs text-emerald-500/70">Your data is synced live to this code</p>
               </div>
               <button 
                 onClick={onDisconnectSyncCode}
@@ -140,37 +140,37 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                 Disconnect
               </button>
             </div>
-            <div className="flex flex-col items-center p-4 bg-black/40 rounded-xl border border-zinc-800/50">
-              <span className="text-xs text-zinc-500 mb-1">Your Unique Sync Code</span>
-              <span className="text-3xl font-mono tracking-widest text-emerald-400">{syncCode}</span>
-              <span className="text-xs text-zinc-500 mt-2 text-center max-w-sm">
+            <div className="flex flex-col items-center p-3.5 sm:p-4 bg-black/40 rounded-xl border border-zinc-800/50">
+              <span className="text-[10px] sm:text-xs text-zinc-500 mb-1">Your Unique Sync Code</span>
+              <span className="text-2xl sm:text-3xl font-mono tracking-widest text-emerald-400">{syncCode}</span>
+              <span className="text-[10px] sm:text-xs text-zinc-500 mt-2 text-center max-w-sm">
                 Enter this code on another device to instantly mirror your current session.
               </span>
             </div>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
             {/* Generate Code */}
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-5 space-y-4 flex flex-col justify-between">
+            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5 space-y-3 sm:space-y-4 flex flex-col justify-between">
               <div>
-                <h3 className="text-sm font-medium text-zinc-300 mb-1">Create New Sync Code</h3>
-                <p className="text-xs text-zinc-500">
+                <h3 className="text-xs sm:text-sm font-medium text-zinc-300 mb-1">Create New Sync Code</h3>
+                <p className="text-[11px] sm:text-xs text-zinc-500">
                   Generate a secure 9-character code to share your current session with other devices.
                 </p>
               </div>
               <button
                 onClick={onGenerateSyncCode}
-                className="w-full rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-2 text-sm font-medium hover:bg-emerald-500/20 transition cursor-pointer"
+                className="w-full rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-2 text-xs sm:text-sm font-medium hover:bg-emerald-500/20 transition cursor-pointer"
               >
                 Generate Sync Code
               </button>
             </div>
 
             {/* Join Code */}
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-5 space-y-4">
+            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5 space-y-3 sm:space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-zinc-300 mb-1">Connect Existing Device</h3>
-                <p className="text-xs text-zinc-500">
+                <h3 className="text-xs sm:text-sm font-medium text-zinc-300 mb-1">Connect Existing Device</h3>
+                <p className="text-[11px] sm:text-xs text-zinc-500">
                   Enter a code from another device to sync and override your current local data.
                 </p>
               </div>
@@ -181,12 +181,12 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(formatSyncCodeInput(e.target.value))}
                   maxLength={11}
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2 text-center font-mono text-zinc-100 outline-none focus:border-emerald-500/50 uppercase tracking-widest"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-center font-mono text-zinc-100 outline-none focus:border-emerald-500/50 uppercase tracking-widest text-xs sm:text-sm"
                 />
                 <button
                   type="submit"
                   disabled={joinCodeInput.length !== 11}
-                  className="w-full rounded-xl bg-zinc-800 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-xl bg-zinc-800 py-2 text-xs sm:text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Sync with Code
                 </button>
@@ -198,16 +198,16 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
       </section>
 
       {/* Daily Targets & Real-time Progress */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm">
-        <div className="mb-6 flex items-center justify-between">
+      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
+        <div className="mb-4 sm:mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-zinc-400" />
-            <h2 className="font-semibold text-zinc-200">Daily Study Targets & Live Stats</h2>
+            <Target className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-400" />
+            <h2 className="font-semibold text-sm sm:text-base text-zinc-200">Daily Study Targets & Live Stats</h2>
           </div>
-          <span className="text-xs text-zinc-500">Auto-calculated from logged sessions</span>
+          <span className="text-[10px] sm:text-xs text-zinc-500 hidden sm:inline">Auto-calculated from logged sessions</span>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3 text-xs">
+        <div className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 text-xs">
           {/* Target 1: Focus Minutes */}
           <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 space-y-3">
             <div className="flex justify-between items-center text-zinc-300">
