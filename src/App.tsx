@@ -818,7 +818,7 @@ export default function App() {
       />
 
       {/* Main Workspace */}
-      <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8 w-full max-w-7xl mx-auto">
+      <main className="flex-grow flex flex-col items-center justify-center p-3 sm:p-4 md:p-8 w-full max-w-7xl mx-auto">
         {activeTab === 'clock' && (
           <ClockView
             exam={exam}

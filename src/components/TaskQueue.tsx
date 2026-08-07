@@ -50,18 +50,18 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
   return (
     <div className="mx-auto w-full max-w-5xl animate-in fade-in zoom-in-95 duration-500">
       {/* Header Banner */}
-      <div className="mb-6 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 sm:mb-6 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <CheckSquare className="h-6 w-6 text-emerald-400" />
-            <h1 className="text-xl font-semibold text-zinc-100">Daily Study Task Queue</h1>
+            <CheckSquare className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 shrink-0" />
+            <h1 className="text-lg sm:text-xl font-semibold text-zinc-100">Daily Study Task Queue</h1>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
             Organize daily tasks by priority, sync completed items to Firestore, and schedule on Google Calendar.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-black/40 px-4 py-2 text-xs">
+        <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-black/40 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs">
           <span className="text-zinc-400">Progress:</span>
           <span className="font-semibold text-zinc-100">
             {completedCount} / {tasks.length} Completed
@@ -70,9 +70,9 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
       </div>
 
       {/* Task Creation Form */}
-      <section className="mb-8 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm">
-        <h2 className="text-sm font-medium text-zinc-200 mb-4">Add Daily Study Task</h2>
-        <form onSubmit={handleCreateTask} className="grid gap-3 sm:grid-cols-12">
+      <section className="mb-6 sm:mb-8 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
+        <h2 className="text-xs sm:text-sm font-medium text-zinc-200 mb-3 sm:mb-4">Add Daily Study Task</h2>
+        <form onSubmit={handleCreateTask} className="grid gap-2.5 sm:grid-cols-12">
           <input
             type="text"
             required
@@ -110,13 +110,13 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
       </section>
 
       {/* Filter Tabs */}
-      <div className="mb-4 flex items-center justify-between gap-2 border-b border-zinc-800/60 pb-3">
-        <div className="flex items-center gap-1">
+      <div className="mb-4 flex items-center justify-between gap-2 border-b border-zinc-800/60 pb-3 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 shrink-0">
           {['all', 'high', 'medium', 'low'].map((p) => (
             <button
               key={p}
               onClick={() => setFilterPriority(p)}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium capitalize transition ${
+              className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition whitespace-nowrap ${
                 filterPriority === p
                   ? 'bg-zinc-100 text-zinc-950'
                   : 'text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-200'
