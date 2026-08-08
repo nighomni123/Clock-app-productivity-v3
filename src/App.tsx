@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Navbar } from './components/Navbar';
 import { ClockView } from './components/ClockView';
 import { FocusWorkspace } from './components/FocusWorkspace';
@@ -903,6 +904,9 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         userAuth={userAuth}
       />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
