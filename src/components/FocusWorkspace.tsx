@@ -17,6 +17,9 @@ interface FocusWorkspaceProps {
   distractionLog: DistractionItem[];
   onLogDistraction: (text: string, intention: string, durationSeconds?: number) => void;
   onLogCompletedSession: (focusMinutes: number) => void;
+  // New props for journal integration
+  onStartSessionLog?: (startTime: number, title?: string) => Promise<string | undefined | void>;
+  onUpdateSessionLog?: (id: string | undefined | null, endTime: number) => Promise<void> | void;
 }
 
 const formatClock = (milliseconds: number): string => {
@@ -59,6 +62,8 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const completionLockRef = useRef(false);
   const strictModePausedAtRef = useRef<number | null>(null);
   const [strictAlert, setStrictAlert] = useState<{ durationSeconds: number } | null>(null);
+  // Track the active activity log id for the currently running focus segment
+  const sessionLogIdRef = useRef<string | null>(null);
 
   const isRunningRef = useRef(isRunning);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
@@ -73,12 +78,22 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
     if (!settings.strictMode) return;
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+        if (document.hidden) {
         if (isRunningRef.current && modeRef.current === 'focus') {
           strictModePausedAtRef.current = Date.now();
           const remaining = Math.max(0, endTimeRef.current - Date.now());
           setTimeLeft(remaining);
           setIsRunning(false);
+
+          // Update the active activity log endTime to now (pausing the journal segment)
+          if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
+            try {
+              onUpdateSessionLog(sessionLogIdRef.current, Date.now());
+            } catch (e) {
+              // non-fatal
+            }
+            sessionLogIdRef.current = null;
+          }
         }
       } else {
         if (strictModePausedAtRef.current !== null) {
@@ -95,6 +110,17 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
           completionLockRef.current = false;
           endTimeRef.current = Date.now() + timeLeftRef.current;
           setIsRunning(true);
+
+          // Start a new activity log segment for resumed focus
+          if (typeof onStartSessionLog === 'function') {
+            // don't await to avoid delaying UI
+            Promise.resolve()
+              .then(() => onStartSessionLog(Date.now(), intention || 'Focus Session'))
+              .then((id) => {
+                if (typeof id === 'string') sessionLogIdRef.current = id;
+              })
+              .catch(() => {});
+          }
         }
       }
     };
@@ -139,6 +165,16 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
     completionLockRef.current = true;
     setIsRunning(false);
     setTimeLeft(0);
+
+    // Update the active activity log endTime to now
+    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
+      try {
+        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
+      } catch (e) {
+        // non-fatal
+      }
+      sessionLogIdRef.current = null;
+    }
 
     // Audio chime
     playSound(settings.sound, settings.volume);
@@ -202,16 +238,45 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
     if (isRunning) {
       setTimeLeft(Math.max(0, endTimeRef.current - Date.now()));
       setIsRunning(false);
+
+      // close the active journal segment when pausing
+      if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
+        try {
+          onUpdateSessionLog(sessionLogIdRef.current, Date.now());
+        } catch (e) {
+          // ignore
+        }
+        sessionLogIdRef.current = null;
+      }
     } else {
       completionLockRef.current = false;
       endTimeRef.current = Date.now() + timeLeft;
       setIsRunning(true);
+
+      // start a journal entry for this focus segment
+      if (typeof onStartSessionLog === 'function') {
+        Promise.resolve()
+          .then(() => onStartSessionLog(Date.now(), intention || 'Focus Session'))
+          .then((id) => {
+            if (typeof id === 'string') sessionLogIdRef.current = id;
+          })
+          .catch(() => {});
+      }
     }
   }, [isRunning, mode, setTimerMode, timeLeft]);
 
   const resetTimer = useCallback(() => {
     setIsRunning(false);
     completionLockRef.current = false;
+
+    // If there is an active journal segment, close it on reset
+    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
+      try {
+        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
+      } catch (e) {}
+      sessionLogIdRef.current = null;
+    }
+
     const duration = durationForMode(mode);
     setSessionDuration(duration);
     setTimeLeft(duration);

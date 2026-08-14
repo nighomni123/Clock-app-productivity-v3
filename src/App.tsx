@@ -463,17 +463,48 @@ export default function App() {
           updateSyncDoc(syncCode, { activityLogs: next });
           return next;
         });
-        return;
+        return newLog.id;
       }
 
-      if (!userAuth?.uid) return;
+      if (!userAuth?.uid) return newLog.id;
       try {
-        await addDoc(collection(db, 'activity_logs'), newLog);
+        // Use a deterministic doc id so it can be updated later
+        const newDocRef = doc(collection(db, 'activity_logs'));
+        const withId = { ...newLog, id: newDocRef.id };
+        await setDoc(doc(db, 'activity_logs', newDocRef.id), withId);
+        setActivityLogs((prev) => [withId, ...prev]);
+        return newDocRef.id;
       } catch (err) {
         console.warn('Error adding activity log:', err);
+        return newLog.id;
       }
     },
     [userAuth?.uid, syncCode]
+  );
+
+  // Update an existing activity log (used to set endTime when session pauses/finishes)
+  const handleUpdateActivityLog = useCallback(
+    async (id: string, updates: Partial<ActivityLog>) => {
+      if (!id) return;
+      // Local update
+      setActivityLogs((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)));
+
+      if (syncCode) {
+        // push full list to sync doc
+        setActivityLogs((prev) => {
+          updateSyncDoc(syncCode, { activityLogs: prev });
+          return prev;
+        });
+        return;
+      }
+
+      try {
+        await setDoc(doc(db, 'activity_logs', id), updates, { merge: true });
+      } catch (err) {
+        console.warn('Error updating activity log:', err);
+      }
+    },
+    [syncCode]
   );
 
   const handleRemoveActivityLog = useCallback(
@@ -650,6 +681,24 @@ export default function App() {
       setDistractions((prev) => [newDistraction, ...prev]);
       setTodayStats((prev) => ({ ...prev, distractions: prev.distractions + 1 }));
 
+      // Also record distraction as a short activity in the Activity Journal when a duration is provided
+      if (durationSeconds !== undefined && durationSeconds > 0) {
+        try {
+          const now = Date.now();
+          await handleAddActivityLog({
+            title: `Distraction: ${text}`,
+            category: 'Other',
+            startTime: now - durationSeconds * 1000,
+            endTime: now,
+            rating: 1,
+            notes: `From session: ${sessionGoal}`
+          });
+        } catch (err) {
+          // Non-fatal — activity log best-effort
+          console.warn('Failed to add distraction activity log:', err);
+        }
+      }
+
       if (syncCode) {
         setDistractions((prev) => {
           updateSyncDoc(syncCode, { distractions: prev });
@@ -691,7 +740,7 @@ export default function App() {
         handleFirestoreError(err, 'write', `users/${userAuth?.uid}/daily`);
       }
     },
-    [userAuth?.uid, syncCode, distractions, todayStats]
+    [userAuth?.uid, syncCode, distractions, todayStats, handleAddActivityLog]
   );
 
   const handleUpdateNotes = useCallback(
@@ -851,6 +900,20 @@ export default function App() {
             distractionLog={distractions}
             onLogDistraction={handleLogDistraction}
             onLogCompletedSession={handleLogCompletedSession}
+            // New handlers for journal integration: create an ActivityLog when session starts and update when paused/finished
+            onStartSessionLog={async (startTime: number, title?: string) => {
+              const id = await handleAddActivityLog({
+                title: title || intention || 'Focus Session',
+                category: 'Work',
+                startTime: startTime,
+                endTime: startTime,
+                rating: 5
+              });
+              return id;
+            }}
+            onUpdateSessionLog={async (id: string, endTime: number) => {
+              await handleUpdateActivityLog(id, { endTime });
+            }}
           />
         )}
 
