@@ -32,7 +32,18 @@ export function handleFirestoreError(error: unknown, operation: OperationType, p
   const err = error as { code?: string; message?: string };
   console.warn(`Firestore ${operation} error on path [${path}]:`, err?.code || err?.message || error);
 }
-import firebaseConfigData from '../../firebase-applet-config.json';
+const firebaseConfigData = {
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || undefined,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
+  oAuthClientId: import.meta.env.VITE_FIREBASE_OAUTH_CLIENT_ID || undefined,
+  recaptchaSiteKey: import.meta.env.VITE_FIREBASE_RECAPTCHA_SITE_KEY || ''
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfigData);
