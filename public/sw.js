@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focus-clock-v1';
+const CACHE_NAME = 'focus-clock-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -34,29 +34,43 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome-extension or external cross-origin requests that might fail
   if (!event.request.url.startsWith(self.location.origin)) return;
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(event.request).then((networkResponse) => {
+  const request = event.request;
+  const isNavigation =
+    request.mode === 'navigate' || (request.headers.get('accept') || '').includes('text/html');
+
+  // HTML navigations are NETWORK-FIRST so new deployments take effect immediately;
+  // the cached shell is only a fallback when offline.
+  if (isNavigation) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy)).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  // Static assets (hashed filenames) use stale-while-revalidate:
+  // serve cached instantly, refresh in the background.
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      const refresh = fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const copy = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse.clone());
+              cache.put(request, copy);
             });
           }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        return caches.match('/');
-      });
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+      return cachedResponse || refresh;
     })
   );
 });
