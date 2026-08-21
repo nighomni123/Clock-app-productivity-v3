@@ -780,10 +780,11 @@ export default function App() {
         isOnline={isOnline}
         userAuth={userAuth}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        todayStats={todayStats}
       />
 
       {/* Main Workspace */}
-      <main className="flex-grow flex flex-col items-center justify-center p-3 sm:p-4 md:p-8 w-full max-w-7xl mx-auto">
+      <main className="flex-grow flex flex-col p-3 sm:p-4 md:p-6 lg:p-8 w-full max-w-7xl mx-auto lg:pl-72 pt-4 lg:pt-8 pb-24 lg:pb-10">
         {activeTab === 'clock' && (
           <ClockView
             exam={exam}
@@ -831,6 +832,7 @@ export default function App() {
           <ActivityJournal
             logs={activityLogs}
             onAddLog={handleAddActivityLog}
+            onUpdateLog={handleUpdateActivityLog}
             onRemoveLog={handleRemoveActivityLog}
           />
         )}

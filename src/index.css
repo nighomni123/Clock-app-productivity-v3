@@ -1,5 +1,42 @@
 @import "tailwindcss";
 
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-black text-zinc-100 font-sans antialiased;
+    background-image:
+      radial-gradient(60rem 60rem at 85% -10%, rgba(99, 102, 241, 0.12), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 20%, rgba(217, 70, 239, 0.10), transparent 55%),
+      radial-gradient(45rem 45rem at 50% 120%, rgba(56, 189, 248, 0.08), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  /* Custom slim scrollbar for the dark theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -7,5 +44,18 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Glass surface used across the app */
+  .glass {
+    background-color: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Soft entrance for cards */
+  .card-shadow {
+    box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 20px 40px -24px rgba(0, 0, 0, 0.8);
   }
 }
