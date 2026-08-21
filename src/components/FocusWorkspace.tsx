@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, AlertTriangle, Maximize2, Minimize2, FileText, 
 import { UserSettings, TaskItem, DistractionItem } from '../types';
 import { playSound } from '../lib/audio';
 import { sendNotification } from '../lib/notifications';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface FocusWorkspaceProps {
   settings: UserSettings;
@@ -17,21 +18,11 @@ interface FocusWorkspaceProps {
   distractionLog: DistractionItem[];
   onLogDistraction: (text: string, intention: string, durationSeconds?: number) => void;
   onLogCompletedSession: (focusMinutes: number) => void;
-  // New props for journal integration
-  onStartSessionLog?: (startTime: number, title?: string) => Promise<string | undefined | void>;
-  onUpdateSessionLog?: (id: string | undefined | null, endTime: number) => Promise<void> | void;
+  onOpenJournal?: () => void;
+  journalEntries?: any[];
 }
 
-const formatClock = (milliseconds: number): string => {
-  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-};
+type TimerMode = 'focus' | 'break' | 'longBreak';
 
 export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   settings,
@@ -45,745 +36,469 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   onUpdateNotes,
   distractionLog,
   onLogDistraction,
-  onLogCompletedSession
+  onLogCompletedSession,
+  onOpenJournal,
+  journalEntries = []
 }) => {
-  const [mode, setMode] = useState<'focus' | 'break' | 'longBreak'>('focus');
+  const [timerMode, setTimerModeState] = useState<TimerMode>('focus');
   const [isRunning, setIsRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(settings.focusMinutes * 60000);
-  const [sessionDuration, setSessionDuration] = useState(settings.focusMinutes * 60000);
+  const [timeLeft, setTimeLeft] = useState(settings.focusMinutes * 60);
   const [completedInCycle, setCompletedInCycle] = useState(0);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [distractionInput, setDistractionInput] = useState('');
+  const [sessionDuration, setSessionDuration] = useState(settings.focusMinutes * 60);
   const [focusFullscreen, setFocusFullscreen] = useState(false);
-  const [showFsDistractionModal, setShowFsDistractionModal] = useState(false);
-  const [fsDistractionInput, setFsDistractionInput] = useState('');
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newDistraction, setNewDistraction] = useState('');
+  const [strictAlert, setStrictAlert] = useState<{ text: string; durationSeconds: number } | null>(null);
 
-  const endTimeRef = useRef(0);
+  const endTimeRef = useRef<number | null>(null);
   const completionLockRef = useRef(false);
-  const strictModePausedAtRef = useRef<number | null>(null);
-  const [strictAlert, setStrictAlert] = useState<{ durationSeconds: number } | null>(null);
-  // Track the active activity log id for the currently running focus segment
-  const sessionLogIdRef = useRef<string | null>(null);
+  const distractionStartTimeRef = useRef<number | null>(null);
 
-  const isRunningRef = useRef(isRunning);
-  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
-
-  const modeRef = useRef(mode);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
-
-  const timeLeftRef = useRef(timeLeft);
-  useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
-
+  // Timer logic
   useEffect(() => {
-    if (!settings.strictMode) return;
+    if (!isRunning) return;
 
-    const handleVisibilityChange = () => {
-        if (document.hidden) {
-        if (isRunningRef.current && modeRef.current === 'focus') {
-          strictModePausedAtRef.current = Date.now();
-          const remaining = Math.max(0, endTimeRef.current - Date.now());
-          setTimeLeft(remaining);
-          setIsRunning(false);
+    const interval = setInterval(() => {
+      if (endTimeRef.current) {
+        const remaining = Math.max(0, Math.floor((endTimeRef.current - Date.now()) / 1000));
+        setTimeLeft(remaining);
 
-          // Update the active activity log endTime to now (pausing the journal segment)
-          if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-            try {
-              onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-            } catch (e) {
-              // non-fatal
-            }
-            sessionLogIdRef.current = null;
-          }
-        }
-      } else {
-        if (strictModePausedAtRef.current !== null) {
-          const durationMs = Date.now() - strictModePausedAtRef.current;
-          const durationSeconds = Math.round(durationMs / 1000);
-          
-          if (durationSeconds >= 1) {
-            onLogDistraction('Strict Mode: App sent to background', intention || 'General Study', durationSeconds);
-            setStrictAlert({ durationSeconds });
-            setTimeout(() => setStrictAlert(null), 5000);
-          }
-          
-          strictModePausedAtRef.current = null;
-          completionLockRef.current = false;
-          endTimeRef.current = Date.now() + timeLeftRef.current;
-          setIsRunning(true);
-
-          // Start a new activity log segment for resumed focus
-          if (typeof onStartSessionLog === 'function') {
-            // don't await to avoid delaying UI
-            Promise.resolve()
-              .then(() => onStartSessionLog(Date.now(), intention || 'Focus Session'))
-              .then((id) => {
-                if (typeof id === 'string') sessionLogIdRef.current = id;
-              })
-              .catch(() => {});
-          }
+        if (remaining === 0 && !completionLockRef.current) {
+          completionLockRef.current = true;
+          handleTimerComplete();
         }
       }
-    };
+    }, 100);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [settings.strictMode, intention, onLogDistraction]);
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
-  const durationForMode = useCallback(
-    (m: 'focus' | 'break' | 'longBreak') => {
-      if (m === 'break') return settings.breakMinutes * 60000;
-      if (m === 'longBreak') return settings.longBreakMinutes * 60000;
-      return settings.focusMinutes * 60000;
-    },
-    [settings.focusMinutes, settings.breakMinutes, settings.longBreakMinutes]
-  );
-
-  const setTimerMode = useCallback(
-    (nextMode: 'focus' | 'break' | 'longBreak', autoStart = false) => {
-      const duration = durationForMode(nextMode);
-      setMode(nextMode);
-      setSessionDuration(duration);
-      setTimeLeft(duration);
-      setIsRunning(autoStart);
-      completionLockRef.current = false;
-      if (autoStart) {
-        endTimeRef.current = Date.now() + duration;
-      }
-    },
-    [durationForMode]
-  );
-
-  useEffect(() => {
-    if (isRunning) return;
-    const duration = durationForMode(mode);
-    setSessionDuration(duration);
-    setTimeLeft(duration);
-  }, [settings, mode, isRunning, durationForMode]);
-
-  const finishSession = useCallback(() => {
-    if (completionLockRef.current) return;
-    completionLockRef.current = true;
+  const handleTimerComplete = () => {
     setIsRunning(false);
-    setTimeLeft(0);
-
-    // Update the active activity log endTime to now
-    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-      try {
-        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-      } catch (e) {
-        // non-fatal
-      }
-      sessionLogIdRef.current = null;
-    }
-
-    // Audio chime
     playSound(settings.sound, settings.volume);
 
-    // Web Notification
-    if (settings.enableNotifications) {
-      const title = mode === 'focus' ? 'Focus Session Completed!' : 'Break Completed!';
-      const body = mode === 'focus' ? 'Great job! Time for a short break.' : 'Break is over. Ready to focus again?';
-      sendNotification(title, { body });
-    }
+    if (timerMode === 'focus') {
+      const focusMinutes = settings.focusMinutes;
+      onLogCompletedSession(focusMinutes);
+      sendNotification('Focus session complete!', { body: 'Time for a break.' });
 
-    if (mode === 'focus') {
-      onLogCompletedSession(settings.focusMinutes);
-
+      const isLongBreakDue = (completedInCycle + 1) % settings.sessionsBeforeLongBreak === 0;
       const nextCompleted = completedInCycle + 1;
-      const isLongBreakDue = nextCompleted >= settings.sessionsBeforeLongBreak;
-      setCompletedInCycle(isLongBreakDue ? 0 : nextCompleted);
+      setCompletedInCycle(nextCompleted);
 
       setTimeout(() => {
         setTimerMode(isLongBreakDue ? 'longBreak' : 'break', settings.autoStartBreaks);
       }, 900);
     } else {
+      sendNotification('Break over!', { body: 'Ready for another focus session?' });
       setTimeout(() => {
         setTimerMode('focus', settings.autoStartFocus);
       }, 900);
     }
-  }, [
-    completedInCycle,
-    mode,
-    onLogCompletedSession,
-    setTimerMode,
-    settings.autoStartBreaks,
-    settings.autoStartFocus,
-    settings.enableNotifications,
-    settings.focusMinutes,
-    settings.sessionsBeforeLongBreak,
-    settings.sound,
-    settings.volume
-  ]);
+  };
 
-  useEffect(() => {
-    if (!isRunning) return;
-    const tick = () => {
-      const remaining = endTimeRef.current - Date.now();
-      if (remaining <= 0) {
-        finishSession();
-        return;
-      }
-      setTimeLeft(remaining);
-    };
-    tick();
-    const interval = setInterval(tick, 250);
-    return () => clearInterval(interval);
-  }, [isRunning, finishSession]);
-
-  const toggleTimer = useCallback(() => {
-    if (timeLeft <= 0) {
-      setTimerMode(mode, true);
-      return;
-    }
-    if (isRunning) {
-      setTimeLeft(Math.max(0, endTimeRef.current - Date.now()));
-      setIsRunning(false);
-
-      // close the active journal segment when pausing
-      if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-        try {
-          onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-        } catch (e) {
-          // ignore
-        }
-        sessionLogIdRef.current = null;
-      }
-    } else {
-      completionLockRef.current = false;
-      endTimeRef.current = Date.now() + timeLeft;
-      setIsRunning(true);
-
-      // start a journal entry for this focus segment
-      if (typeof onStartSessionLog === 'function') {
-        Promise.resolve()
-          .then(() => onStartSessionLog(Date.now(), intention || 'Focus Session'))
-          .then((id) => {
-            if (typeof id === 'string') sessionLogIdRef.current = id;
-          })
-          .catch(() => {});
-      }
-    }
-  }, [isRunning, mode, setTimerMode, timeLeft]);
-
-  const resetTimer = useCallback(() => {
-    setIsRunning(false);
-    completionLockRef.current = false;
-
-    // If there is an active journal segment, close it on reset
-    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-      try {
-        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-      } catch (e) {}
-      sessionLogIdRef.current = null;
-    }
-
-    const duration = durationForMode(mode);
+  const setTimerMode = (mode: TimerMode, autoStart: boolean) => {
+    setTimerModeState(mode);
+    const duration = mode === 'focus' 
+      ? settings.focusMinutes * 60 
+      : mode === 'break' 
+      ? settings.breakMinutes * 60 
+      : settings.longBreakMinutes * 60;
+    
     setSessionDuration(duration);
     setTimeLeft(duration);
-  }, [durationForMode, mode]);
+    setIsRunning(autoStart);
+    completionLockRef.current = false;
+    
+    if (autoStart) {
+      endTimeRef.current = Date.now() + duration;
+    } else {
+      endTimeRef.current = null;
+    }
+  };
 
-  const handleLogDistractionSubmit = useCallback(
-    (customText?: string) => {
-      const text = customText || distractionInput.trim();
-      if (!text) return;
-      onLogDistraction(text, intention || 'General Study');
-      setDistractionInput('');
-    },
-    [distractionInput, intention, onLogDistraction]
-  );
+  const toggleTimer = () => {
+    if (isRunning) {
+      setIsRunning(false);
+      endTimeRef.current = null;
+    } else {
+      setIsRunning(true);
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+    }
+  };
+
+  const resetTimer = () => {
+    setIsRunning(false);
+    setTimeLeft(sessionDuration);
+    endTimeRef.current = null;
+    completionLockRef.current = false;
+  };
+
+  const handleAddTask = () => {
+    if (!newTaskTitle.trim()) return;
+    onAddTask(newTaskTitle.trim());
+    setNewTaskTitle('');
+  };
+
+  const handleLogDistraction = () => {
+    if (!newDistraction.trim()) return;
+    
+    let durationSeconds = 0;
+    if (distractionStartTimeRef.current) {
+      durationSeconds = Math.floor((Date.now() - distractionStartTimeRef.current) / 1000);
+      distractionStartTimeRef.current = null;
+    }
+
+    onLogDistraction(newDistraction.trim(), intention, durationSeconds);
+    
+    if (settings.strictMode && isRunning && timerMode === 'focus') {
+      setStrictAlert({ text: newDistraction.trim(), durationSeconds });
+      setTimeout(() => setStrictAlert(null), 4000);
+    }
+    
+    setNewDistraction('');
+  };
+
+  const startDistractionTimer = () => {
+    distractionStartTimeRef.current = Date.now();
+  };
 
   const toggleFullscreenMode = useCallback(() => {
     setFocusFullscreen((curr) => !curr);
   }, []);
 
-  // Keyboard Shortcuts Listener
+  // Keyboard shortcuts
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const isTyping =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        target?.isContentEditable;
-      if (isTyping) return;
-
-      if (e.code === 'Space') {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.target) {
         e.preventDefault();
         toggleTimer();
-      } else if (e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        resetTimer();
-      } else if (e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-        if (focusFullscreen) {
-          setShowFsDistractionModal((prev) => !prev);
-        } else {
-          handleLogDistractionSubmit('Quick Distraction logged via key shortcut');
-        }
-      } else if (e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        document.getElementById('quick-notes-textarea')?.focus();
-      } else if (e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        toggleFullscreenMode();
-      } else if (e.key === 'Escape' && focusFullscreen) {
-        setFocusFullscreen(false);
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focusFullscreen, handleLogDistractionSubmit, resetTimer, toggleFullscreenMode, toggleTimer]);
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [toggleTimer]);
 
-  const progress = sessionDuration ? ((sessionDuration - timeLeft) / sessionDuration) * 100 : 0;
-  const activeLabel = mode === 'focus' ? 'Focus Block' : mode === 'longBreak' ? 'Long Break' : 'Short Break';
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = ((sessionDuration - timeLeft) / sessionDuration) * 100;
+  const activeTasks = tasks.filter(t => !t.completed);
 
   if (focusFullscreen) {
     return (
-      <div className="fixed inset-0 z-[9999] h-screen w-screen flex flex-col items-center justify-between bg-zinc-950 p-2 sm:p-4 md:p-6 text-zinc-100 select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-        {/* Ambient Progress Fill */}
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 bg-zinc-900/50 transition-all duration-500 ease-linear"
-          style={{ height: `${progress}%` }}
-        />
+      <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={toggleFullscreenMode}
+          className="absolute top-6 right-6 p-3 rounded-full bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+        >
+          <Minimize2 className="w-5 h-5 text-zinc-400" />
+        </motion.button>
 
-        {/* Top Header */}
-        <div className="relative z-20 flex w-full max-w-6xl items-center justify-between gap-1.5 sm:gap-2 shrink-0 py-0.5">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.15em] sm:tracking-[0.25em] text-zinc-400">
-              {activeLabel}
-            </span>
-            <span className="text-[10px] sm:text-xs text-zinc-600 font-mono">({Math.round(progress)}%)</span>
-          </div>
-
-          <div className="flex rounded-full border border-zinc-800/80 bg-zinc-900/90 p-0.5 backdrop-blur-md">
-            {[
-              ['focus', 'Focus'],
-              ['break', 'Break'],
-              ['longBreak', 'Long Break']
-            ].map(([mKey, label]) => (
-              <button
-                key={mKey}
-                onClick={() => setTimerMode(mKey as 'focus' | 'break' | 'longBreak')}
-                className={`rounded-full px-2 sm:px-4 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium transition ${
-                  mode === mKey
-                    ? 'bg-zinc-100 text-zinc-950 shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <button
-            id="exit-fullscreen-btn"
-            onClick={toggleFullscreenMode}
-            className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/80 px-2.5 sm:px-3.5 py-1 text-[10px] sm:text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-white backdrop-blur-md shrink-0"
-            title="Exit Fullscreen (ESC or F)"
-          >
-            <Minimize2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            <span className="hidden sm:inline">Exit</span>
-            <kbd className="hidden sm:inline-block rounded bg-zinc-800 px-1 py-0.5 text-[9px] text-zinc-400 border border-zinc-700/60">ESC</kbd>
-          </button>
-        </div>
-
-        {/* Strict Mode Alert Overlay */}
-        {strictAlert && (
-          <div className="relative z-30 animate-in slide-in-from-top-4 fade-in duration-300 my-0.5 shrink-0">
-            <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 px-3 py-1 sm:py-1.5 rounded-xl backdrop-blur-md shadow-2xl flex items-center gap-2 text-[11px] sm:text-xs">
-              <AlertTriangle className="h-3.5 w-3.5 text-rose-400 shrink-0" />
-              <span className="font-medium">Strict Mode Triggered!</span>
-              <span className="text-[9px] sm:text-[10px] bg-rose-950/60 px-1.5 py-0.2 rounded text-rose-300 border border-rose-900/50">
-                {strictAlert.durationSeconds > 60 ? `${Math.round(strictAlert.durationSeconds / 60)}m` : `${strictAlert.durationSeconds}s`} recorded
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Main Center Section - Vertically Centered Clock with Controls BELOW the clock */}
-        <div className="relative z-20 flex w-full max-w-3xl flex-1 min-h-0 flex-col items-center justify-center my-auto py-1">
-          <div className="flex flex-col items-center justify-center w-full my-auto">
-            
-            {/* Session Intention Goal (Above Clock) */}
-            <div className="px-2 max-w-md sm:max-w-xl text-center">
-              {intention ? (
-                <>
-                  <p className="text-[8px] sm:text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500 mb-0.5">Session Goal</p>
-                  <h2 className="text-xs sm:text-base md:text-lg font-light text-zinc-100 leading-snug line-clamp-1">
-                    {intention}
-                  </h2>
-                </>
-              ) : (
-                <p className="text-[10px] sm:text-xs text-zinc-600 italic">No goal set for this session</p>
-              )}
-            </div>
-
-            {/* Display Clock - Centered along Y axis, sized dynamically with clamp */}
-            <div className="my-1 sm:my-2 font-extralight tracking-tighter tabular-nums text-zinc-100 font-mono text-[clamp(3.5rem,20vh,11rem)] leading-none drop-shadow-[0_10px_35px_rgba(0,0,0,0.8)] text-center">
-              {formatClock(timeLeft)}
-            </div>
-
-            {/* Controls & Progress Column - Always Stacked BELOW the Clock */}
-            <div className="flex flex-col items-center justify-center w-full max-w-xs sm:max-w-sm shrink-0 mt-1 sm:mt-2">
-              {/* Minimal Progress Bar */}
-              <div className="w-full h-1 sm:h-1.5 bg-zinc-900 rounded-full overflow-hidden my-1 border border-zinc-800/60">
-                <div
-                  className="h-full bg-zinc-200 transition-all duration-300 ease-out"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              {/* Controls Below Clock */}
-              <div className="flex items-center justify-center gap-2.5 sm:gap-4 my-1">
-                <button
-                  id="fs-timer-play-pause-btn"
-                  onClick={toggleTimer}
-                  className="flex h-11 w-11 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:scale-105 active:scale-95 hover:bg-white shadow-2xl shrink-0"
-                  title="Start or Pause (Space)"
-                >
-                  {isRunning ? <Pause className="h-5 w-5 sm:h-7 sm:w-7" /> : <Play className="h-5 w-5 sm:h-7 sm:w-7 ml-0.5" />}
-                </button>
-                <button
-                  id="fs-timer-reset-btn"
-                  onClick={resetTimer}
-                  className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900/90 text-zinc-300 transition hover:border-zinc-700 hover:text-white hover:bg-zinc-800 shrink-0"
-                  title="Reset Session (R)"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
-                </button>
-                <button
-                  id="fs-timer-distraction-btn"
-                  onClick={() => setShowFsDistractionModal((prev) => !prev)}
-                  className={`flex h-9 sm:h-12 items-center gap-1.5 rounded-full border px-3 sm:px-5 text-xs font-medium transition backdrop-blur-md shrink-0 ${
-                    showFsDistractionModal
-                      ? 'border-amber-500 bg-amber-500/20 text-amber-200'
-                      : 'border-amber-900/40 bg-amber-950/30 text-amber-300 hover:bg-amber-950/60'
-                  }`}
-                  title="Log Distraction (D)"
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Log Distraction</span>
-                  <span className="sm:hidden">Log</span>
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Floating Modal for Distraction Log (Doesn't affect page layout or height) */}
-        {showFsDistractionModal && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!fsDistractionInput.trim()) return;
-                onLogDistraction(fsDistractionInput.trim(), intention || 'General Study');
-                setFsDistractionInput('');
-                setShowFsDistractionModal(false);
-              }}
-              className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-amber-900/60 bg-zinc-900 p-4 shadow-2xl animate-in zoom-in-95 duration-200"
+        <div className="text-center">
+          {intention && (
+            <motion.p
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-sm text-zinc-500 mb-4 uppercase tracking-wider"
             >
-              <div className="flex items-center gap-2 text-amber-400">
-                <AlertTriangle className="h-4 w-4" />
-                <h3 className="text-xs font-semibold text-zinc-100">Log Distraction</h3>
-              </div>
-              <input
-                type="text"
-                autoFocus
-                value={fsDistractionInput}
-                onChange={(e) => setFsDistractionInput(e.target.value)}
-                placeholder="What distracted you? (Press Enter)"
-                className="w-full rounded-xl bg-black/70 px-3 py-2 text-xs text-amber-100 placeholder-amber-500/50 outline-none border border-amber-900/40 focus:border-amber-500"
-              />
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowFsDistractionModal(false)}
-                  className="rounded-xl px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-amber-400 transition"
-                >
-                  Log
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+              {intention}
+            </motion.p>
+          )}
 
-        {/* Bottom Shortcut Hints */}
-        <div className="relative z-20 flex flex-wrap justify-center gap-1.5 sm:gap-3 text-[9px] sm:text-[11px] text-zinc-500 shrink-0 py-0.5">
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">Space: Play/Pause</span>
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">R: Reset</span>
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">D: Distraction</span>
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">ESC or F: Exit</span>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative w-80 h-80 mb-12"
+          >
+            <svg className="w-full h-full transform -rotate-90">
+              <circle
+                cx="160"
+                cy="160"
+                r="140"
+                stroke="currentColor"
+                strokeWidth="8"
+                fill="transparent"
+                className="text-zinc-800"
+              />
+              <motion.circle
+                cx="160"
+                cy="160"
+                r="140"
+                stroke="currentColor"
+                strokeWidth="8"
+                fill="transparent"
+                strokeDasharray={2 * Math.PI * 140}
+                initial={{ strokeDashoffset: 2 * Math.PI * 140 }}
+                animate={{ strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100) }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className={timerMode === 'focus' ? 'text-blue-500' : 'text-green-500'}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-7xl font-thin text-white tracking-tight">
+                {formatTime(timeLeft)}
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="flex items-center justify-center gap-4">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={resetTimer}
+              className="p-4 rounded-full bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+            >
+              <RotateCcw className="w-6 h-6 text-zinc-400" />
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleTimer}
+              className="p-6 rounded-full bg-white hover:bg-zinc-200 transition-colors"
+            >
+              {isRunning ? (
+                <Pause className="w-8 h-8 text-black" />
+              ) : (
+                <Play className="w-8 h-8 text-black" />
+              )}
+            </motion.button>
+            <div className="w-14" />
+          </div>
+
+          <div className="mt-8 text-sm text-zinc-500">
+            Session {completedInCycle + 1} · {timerMode === 'focus' ? 'Focus' : timerMode === 'break' ? 'Break' : 'Long Break'}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl animate-in fade-in zoom-in-95 duration-500">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
-        {/* Timer Canvas Panel */}
-        <div className="relative flex flex-col items-center justify-center overflow-hidden min-h-[480px] rounded-3xl border border-zinc-800/80 bg-zinc-900/45 p-8 h-full backdrop-blur-sm">
-          {/* Strict Mode Alert Overlay */}
-          {strictAlert && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
-              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-2 rounded-xl backdrop-blur-md shadow-xl flex items-center gap-2">
-                <span className="text-sm font-medium">Strict Mode Triggered!</span>
-                <span className="text-xs bg-rose-950/50 px-1.5 py-0.5 rounded text-rose-300 border border-rose-900/50">
-                  {strictAlert.durationSeconds > 60 ? `${Math.round(strictAlert.durationSeconds / 60)}m` : `${strictAlert.durationSeconds}s`} recorded
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Ambient Progress Fill */}
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 bg-zinc-800/20 transition-all duration-500 ease-linear"
-            style={{ height: `${progress}%` }}
-          />
-
-          {/* Fullscreen toggle button */}
-          <button
-            id="toggle-fullscreen-button"
-            onClick={toggleFullscreenMode}
-            className="absolute right-5 top-5 z-20 rounded-full p-3 text-zinc-500 transition hover:bg-zinc-800 hover:text-white"
-            title={focusFullscreen ? 'Exit Focus Mode (F)' : 'Enter Fullscreen Focus Mode (F)'}
-          >
-            {focusFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
-          </button>
-
-          <div className="relative z-10 flex w-full max-w-3xl flex-col items-center">
-            {/* Mode Selector */}
-            <div className="mb-6 flex rounded-full border border-zinc-800 bg-black/40 p-1">
-              {[
-                ['focus', 'Focus'],
-                ['break', 'Break'],
-                ['longBreak', 'Long Break']
-              ].map(([mKey, label]) => (
-                <button
-                  key={mKey}
-                  onClick={() => setTimerMode(mKey as 'focus' | 'break' | 'longBreak')}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                    mode === mKey ? 'bg-zinc-100 text-zinc-950 shadow' : 'text-zinc-500 hover:text-zinc-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <p className="mb-2 text-xs font-medium uppercase tracking-[0.3em] text-zinc-500">{activeLabel}</p>
-
-            {/* Display Clock */}
-            <div
-              className={`font-extralight tracking-tighter tabular-nums text-zinc-100 transition-all duration-500 ${
-                focusFullscreen ? 'text-[22vw] leading-none md:text-[13rem]' : 'text-7xl md:text-9xl'
-              }`}
-            >
-              {formatClock(timeLeft)}
-            </div>
-
-            {/* Session Intention */}
-            <div className="mt-6 min-h-[50px] text-center max-w-xl">
-              {intention ? (
-                <>
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Session Goal</p>
-                  <p className={`mt-1 font-light text-zinc-200 ${focusFullscreen ? 'text-2xl md:text-3xl' : 'text-lg'}`}>
-                    {intention}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-zinc-600">Set a study goal in Clock tab or type notes below.</p>
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="mt-8 flex items-center gap-5">
-              <button
-                id="timer-play-pause-btn"
-                onClick={toggleTimer}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:scale-105 hover:bg-white shadow-lg"
-                title="Start or Pause (Space)"
-              >
-                {isRunning ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-0.5" />}
-              </button>
-              <button
-                id="timer-reset-btn"
-                onClick={resetTimer}
-                className="flex h-14 w-14 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:border-zinc-700 hover:text-white"
-                title="Reset Session (R)"
-              >
-                <RotateCcw className="h-5 w-5" />
-              </button>
-              <button
-                id="timer-distraction-btn"
-                onClick={() => handleLogDistractionSubmit('Quick distraction logged')}
-                className="flex h-14 items-center gap-2 rounded-full border border-amber-900/40 bg-amber-950/20 px-5 text-sm text-amber-300 transition hover:bg-amber-950/40"
-                title="Log Distraction (D)"
-              >
-                <AlertTriangle className="h-4 w-4" /> Log Distraction
-              </button>
-            </div>
-
-            {/* Keyboard Shortcuts Footer */}
-            <div className="mt-8 flex flex-wrap justify-center gap-2 text-[11px] text-zinc-600">
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">Space: Play/Pause</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">R: Reset</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">D: Distraction</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">N: Quick Notes</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">F: Fullscreen</span>
-            </div>
+    <div className="min-h-screen bg-black text-zinc-100 pb-24">
+      <div className="max-w-6xl mx-auto px-4 pt-12">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 flex items-center justify-between"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Focus</h1>
+            <p className="text-sm text-zinc-500">
+              {timerMode === 'focus' ? 'Time to focus' : timerMode === 'break' ? 'Take a break' : 'Long break time'}
+            </p>
           </div>
-        </div>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleFullscreenMode}
+            className="p-3 rounded-full bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+          >
+            <Maximize2 className="w-5 h-5 text-zinc-400" />
+          </motion.button>
+        </motion.div>
 
-        {/* Right Sidebar: Tasks Queue, Quick Notes, Distraction Logger */}
-        <div className="flex flex-col gap-6">
-          {/* Quick Tasks Panel */}
-          <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm flex flex-col h-[280px]">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ListFilter className="h-4 w-4 text-zinc-400" />
-                <h2 className="font-medium text-zinc-200 text-sm">Study Task Queue</h2>
-              </div>
-              <span className="text-xs text-zinc-500">{tasks.filter((t) => t.complete).length}/{tasks.length} Done</span>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!newTaskTitle.trim()) return;
-                onAddTask(newTaskTitle.trim());
-                setNewTaskTitle('');
-              }}
-              className="mb-3 flex gap-2"
+        {/* Strict Mode Alert */}
+        <AnimatePresence>
+          {strictAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-6"
             >
-              <input
-                type="text"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                placeholder="Add a quick task..."
-                className="flex-grow rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 outline-none focus:border-zinc-600"
-              />
-              <button
-                type="submit"
-                className="rounded-lg bg-zinc-800 px-3 py-2 text-zinc-200 hover:bg-zinc-700 hover:text-white"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </form>
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-rose-400">Strict Mode Triggered</div>
+                  <div className="text-xs text-rose-400/70">
+                    {strictAlert.text} · {strictAlert.durationSeconds > 60 ? `${Math.round(strictAlert.durationSeconds / 60)}m` : `${strictAlert.durationSeconds}s`}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <div className="flex-grow overflow-y-auto pr-1 space-y-2 text-xs">
-              {tasks.length === 0 ? (
-                <p className="text-center text-zinc-600 mt-6">No tasks added yet.</p>
-              ) : (
-                tasks.map((task) => (
-                  <div
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Timer Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-2"
+          >
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-8">
+              {/* Intention */}
+              {intention && (
+                <div className="text-center mb-6">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Session Goal</p>
+                  <h2 className="text-lg text-white font-light">{intention}</h2>
+                </div>
+              )}
+
+              {/* Timer Circle */}
+              <div className="relative w-64 h-64 mx-auto mb-8">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="128"
+                    cy="128"
+                    r="112"
+                    stroke="currentColor"
+                    strokeWidth="6"
+                    fill="transparent"
+                    className="text-zinc-800"
+                  />
+                  <motion.circle
+                    cx="128"
+                    cy="128"
+                    r="112"
+                    stroke="currentColor"
+                    strokeWidth="6"
+                    fill="transparent"
+                    strokeDasharray={2 * Math.PI * 112}
+                    initial={{ strokeDashoffset: 2 * Math.PI * 112 }}
+                    animate={{ strokeDashoffset: 2 * Math.PI * 112 * (1 - progress / 100) }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className={timerMode === 'focus' ? 'text-blue-500' : 'text-green-500'}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-5xl font-thin text-white tracking-tight">
+                    {formatTime(timeLeft)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={resetTimer}
+                  className="p-4 rounded-full bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
+                >
+                  <RotateCcw className="w-5 h-5 text-zinc-400" />
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={toggleTimer}
+                  className="p-6 rounded-full bg-white hover:bg-zinc-200 transition-colors"
+                >
+                  {isRunning ? (
+                    <Pause className="w-7 h-7 text-black" />
+                  ) : (
+                    <Play className="w-7 h-7 text-black" />
+                  )}
+                </motion.button>
+                <div className="w-13" />
+              </div>
+
+              {/* Session Info */}
+              <div className="text-center text-sm text-zinc-500">
+                Session {completedInCycle + 1} · {timerMode === 'focus' ? 'Focus' : timerMode === 'break' ? 'Break' : 'Long Break'}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Sidebar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-6"
+          >
+            {/* Quick Tasks */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <ListFilter className="w-4 h-4 text-blue-400" />
+                Quick Tasks
+              </h3>
+              <div className="space-y-2 mb-3">
+                {activeTasks.slice(0, 3).map((task) => (
+                  <motion.div
                     key={task.id}
-                    className="group flex items-center justify-between rounded-lg border border-zinc-800/50 bg-black/30 p-2 transition hover:border-zinc-700"
+                    layout
+                    className="flex items-center gap-2 p-2 rounded-lg bg-zinc-800/30"
                   >
-                    <div className="flex items-center gap-2.5 overflow-hidden">
-                      <button
-                        onClick={() => onToggleTask(task.id)}
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
-                          task.complete ? 'bg-zinc-200 border-zinc-200' : 'border-zinc-700 hover:border-zinc-500'
-                        }`}
-                      >
-                        {task.complete && <Check className="h-3 w-3 text-zinc-950" />}
-                      </button>
-                      <span className={`truncate ${task.complete ? 'line-through text-zinc-600' : 'text-zinc-300'}`}>
-                        {task.title}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => onRemoveTask(task.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-400"
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => onToggleTask(task.id)}
+                      className="w-5 h-5 rounded border-2 border-zinc-700 flex items-center justify-center"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* Quick Notes Scratchpad */}
-          <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm flex flex-col h-[200px]">
-            <div className="mb-2 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-zinc-400" />
-              <h2 className="font-medium text-zinc-200 text-sm">Quick Notes Scratchpad</h2>
-            </div>
-            <textarea
-              id="quick-notes-textarea"
-              value={notes}
-              onChange={(e) => onUpdateNotes(e.target.value)}
-              placeholder="Jot down ideas, formulas, or thoughts during focus sessions... (Press N to focus)"
-              className="flex-grow resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300 outline-none focus:border-zinc-600 leading-relaxed"
-            />
-          </section>
-
-          {/* Today's Distraction Logger */}
-          <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm flex flex-col h-[210px]">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <h2 className="font-medium text-zinc-200 text-sm">Distraction Log</h2>
+                      <Check className="w-3 h-3 text-white opacity-0" />
+                    </motion.button>
+                    <span className="text-xs text-zinc-300 flex-1 truncate">{task.title}</span>
+                  </motion.div>
+                ))}
               </div>
-              <span className="rounded-full bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-400 border border-amber-900/40">
-                {distractionLog.length} Recorded
-              </span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                  placeholder="Add task..."
+                  className="flex-1 bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleAddTask}
+                  className="p-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </motion.button>
+              </div>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLogDistractionSubmit();
-              }}
-              className="mb-3 flex gap-2"
-            >
-              <input
-                type="text"
-                value={distractionInput}
-                onChange={(e) => setDistractionInput(e.target.value)}
-                placeholder="What distracted you?"
-                className="flex-grow rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600"
+            {/* Distraction Log */}
+            {settings.strictMode && (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-5">
+                <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  Log Distraction
+                </h3>
+                <div className="space-y-2">
+                  <textarea
+                    value={newDistraction}
+                    onChange={(e) => setNewDistraction(e.target.value)}
+                    onFocus={startDistractionTimer}
+                    placeholder="What distracted you?"
+                    rows={2}
+                    className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
+                  />
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleLogDistraction}
+                    disabled={!newDistraction.trim()}
+                    className="w-full py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-40 text-amber-400 text-xs font-medium transition-colors"
+                  >
+                    Log Distraction
+                  </motion.button>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-green-400" />
+                Session Notes
+              </h3>
+              <textarea
+                value={notes}
+                onChange={(e) => onUpdateNotes(e.target.value)}
+                placeholder="Jot down thoughts..."
+                rows={4}
+                className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-none"
               />
-              <button
-                type="submit"
-                className="rounded-lg border border-amber-900/40 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-950/60"
-              >
-                Log
-              </button>
-            </form>
-
-            <div className="flex-grow overflow-y-auto space-y-1.5 text-xs pr-1">
-              {distractionLog.length === 0 ? (
-                <p className="text-center text-zinc-600 mt-4">No distractions logged today.</p>
-              ) : (
-                distractionLog.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-zinc-800/50 bg-black/40 p-2 flex justify-between items-center gap-2">
-                    <span className="text-zinc-300 truncate flex-grow">{item.text}</span>
-                    {item.durationSeconds !== undefined && (
-                      <span className="text-[10px] text-amber-500/80 bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-900/40 shrink-0">
-                        {item.durationSeconds > 60 ? `${Math.round(item.durationSeconds / 60)}m` : `${item.durationSeconds}s`}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-zinc-500 shrink-0">
-                      {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                ))
-              )}
             </div>
-          </section>
+          </motion.div>
         </div>
       </div>
     </div>

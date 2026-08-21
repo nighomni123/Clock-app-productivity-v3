@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key } from 'lucide-react';
+import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key, ChevronRight, Check, AlertCircle, Wifi, WifiOff, Clock, Coffee, RotateCcw, Hash, Zap, Shield, BarChart3, Flame, Copy, Link2, Unlink } from 'lucide-react';
 import { UserSettings, DailyTarget, DailyStats, UserAuth } from '../types';
 import { SOUND_NAMES, playSound } from '../lib/audio';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface SettingsStatsProps {
   settings: UserSettings;
@@ -19,6 +20,64 @@ interface SettingsStatsProps {
   onDisconnectSyncCode: () => void;
 }
 
+/* ── iOS-style toggle ───────────────────────────────────────────── */
+const IOSToggle: React.FC<{ value: boolean; onToggle: () => void }> = ({ value, onToggle }) => (
+  <motion.button
+    whileTap={{ scale: 0.92 }}
+    onClick={onToggle}
+    className={`relative w-[51px] h-[31px] rounded-full transition-colors duration-300 flex-shrink-0 ${
+      value ? 'bg-green-500' : 'bg-zinc-700'
+    }`}
+  >
+    <motion.div
+      layout
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      className={`absolute top-[2px] w-[27px] h-[27px] rounded-full bg-white shadow-md ${
+        value ? 'left-[22px]' : 'left-[2px]'
+      }`}
+    />
+  </motion.button>
+);
+
+/* ── Reusable iOS row wrapper ───────────────────────────────────── */
+const IOSRow: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  subtitle?: string;
+  children?: React.ReactNode;
+  onClick?: () => void;
+  showChevron?: boolean;
+  isLast?: boolean;
+}> = ({ icon, label, subtitle, children, onClick, showChevron, isLast }) => (
+  <motion.button
+    whileTap={onClick ? { scale: 0.98 } : undefined}
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3 ${!isLast ? 'border-b border-zinc-800/40' : ''} ${
+      onClick ? 'active:bg-zinc-800/30' : ''
+    } transition-colors`}
+  >
+    {icon}
+    <div className="flex-1 min-w-0 text-left">
+      <div className="text-[15px] text-white leading-tight">{label}</div>
+      {subtitle && <div className="text-[13px] text-zinc-500 mt-0.5">{subtitle}</div>}
+    </div>
+    {children}
+    {showChevron && <ChevronRight className="w-4 h-4 text-zinc-600 flex-shrink-0" />}
+  </motion.button>
+);
+
+/* ── Section header ─────────────────────────────────────────────── */
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 px-4">{title}</h2>
+);
+
+/* ── Card wrapper ───────────────────────────────────────────────── */
+const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`bg-zinc-900/60 backdrop-blur-xl rounded-2xl border border-zinc-800/50 overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
 export const SettingsStats: React.FC<SettingsStatsProps> = ({
   settings,
   onUpdateSettings,
@@ -33,436 +92,492 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
   onJoinSyncCode,
   onDisconnectSyncCode
 }) => {
-  const notifStatus = getNotificationPermissionStatus();
-  const [joinCodeInput, setJoinCodeInput] = useState('');
-  const [joinError, setJoinError] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [notifStatus, setNotifStatus] = useState(getNotificationPermissionStatus());
+  const [copied, setCopied] = useState(false);
 
-  const formatSyncCodeInput = (val: string) => {
-    const v = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-    if (v.length <= 3) return v;
-    if (v.length <= 6) return `${v.slice(0,3)}-${v.slice(3)}`;
-    return `${v.slice(0,3)}-${v.slice(3,6)}-${v.slice(6,9)}`;
-  };
+  const sessionPercent = Math.min(100, (todayStats.sessions / dailyTarget.sessions) * 100);
+  const minutesPercent = Math.min(100, (todayStats.focusMinutes / dailyTarget.focusMinutes) * 100);
+  const distractionPercent = dailyTarget.maxDistractions > 0
+    ? Math.min(100, (todayStats.distractions / dailyTarget.maxDistractions) * 100)
+    : 0;
 
-  const handleJoinSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (joinCodeInput.length !== 11) {
-      setJoinError('Code must be 9 characters (e.g. ABC-DEF-GHI)');
-      return;
-    }
-    setJoinError('');
-    const success = await onJoinSyncCode(joinCodeInput);
-    if (!success) {
-      setJoinError('Sync code not found. Please check and try again.');
-    } else {
-      setJoinCodeInput('');
+  const handleRequestNotifs = async () => {
+    const granted = await requestNotificationPermission();
+    setNotifStatus(granted ? 'granted' : 'denied');
+    if (granted) {
+      onUpdateSettings({ ...settings, enableNotifications: true });
     }
   };
 
-  const handleToggleNotifications = async () => {
-    if (!settings.enableNotifications) {
-      const granted = await requestNotificationPermission();
-      if (granted) {
-        onUpdateSettings({ ...settings, enableNotifications: true });
-      } else {
-        alert('Browser notification permissions were not granted. Check browser settings.');
-      }
-    } else {
-      onUpdateSettings({ ...settings, enableNotifications: false });
+  const handleCopyCode = () => {
+    if (syncCode) {
+      navigator.clipboard.writeText(syncCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const focusPercent = Math.min(100, Math.round((todayStats.focusMinutes / (dailyTarget.minutes || 1)) * 100));
-  const sessionPercent = Math.min(100, Math.round((todayStats.sessions / (dailyTarget.sessions || 1)) * 100));
-  const distractionPercent = Math.min(
-    100,
-    Math.round((todayStats.distractions / (dailyTarget.maxDistractions || 1)) * 100)
-  );
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: { staggerChildren: 0.06, delayChildren: 0.05 }
+    }
+  };
+
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 16 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring', stiffness: 260, damping: 24 }
+    }
+  };
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      {/* Account & Firestore Sync Banner */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-zinc-800 border border-zinc-700 text-zinc-100 shrink-0">
-            <User className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold text-sm sm:text-base text-zinc-100">
-                {userAuth
-                  ? userAuth.isAnonymous
-                    ? 'Anonymous Session'
-                    : userAuth.displayName || userAuth.email || 'Registered User'
-                  : 'Not Signed In'}
-              </h2>
-              <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 border border-zinc-700">
-                {userAuth?.isAnonymous ? 'Guest ID: ' + userAuth.uid.slice(0, 6) : 'Synced Account'}
-              </span>
-            </div>
-            <p className="mt-0.5 text-[11px] sm:text-xs text-zinc-400">
-              {userAuth?.isAnonymous
-                ? 'Sign in with Google to persist study sessions across mobile, desktop, and other devices.'
-                : 'Data is synced live to your private Firestore database.'}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={onOpenAuth}
-          className="rounded-xl bg-zinc-100 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-zinc-950 transition hover:bg-white shadow shrink-0"
+    <div className="min-h-screen bg-black text-zinc-100 pb-24">
+      <div className="max-w-lg mx-auto px-4 pt-14">
+        {/* ── Header ──────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          className="mb-8"
         >
-          {userAuth?.isAnonymous ? 'Link Google Account' : 'Account Details'}
-        </button>
-      </section>
+          <h1 className="text-[34px] font-bold text-white tracking-tight leading-tight">Settings</h1>
+        </motion.div>
 
-      {/* Device Pairing & Sync Code */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
-        <div className="mb-4 sm:mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Key className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
-            <h2 className="font-semibold text-sm sm:text-base text-zinc-200">Device Pairing & Sync Code</h2>
-          </div>
-          <span className="text-[10px] sm:text-xs text-zinc-500 hidden sm:inline">Sync data without an account</span>
-        </div>
-
-        {syncCode ? (
-          <div className="rounded-2xl border border-emerald-900/50 bg-emerald-950/20 p-4 sm:p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium text-xs sm:text-sm text-emerald-300">Sync is Active</h3>
-                <p className="text-[10px] sm:text-xs text-emerald-500/70">Your data is synced live to this code</p>
-              </div>
-              <button 
-                onClick={onDisconnectSyncCode}
-                className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs text-rose-400 border border-zinc-800 hover:bg-rose-950 transition cursor-pointer"
-              >
-                Disconnect
-              </button>
-            </div>
-            <div className="flex flex-col items-center p-3.5 sm:p-4 bg-black/40 rounded-xl border border-zinc-800/50">
-              <span className="text-[10px] sm:text-xs text-zinc-500 mb-1">Your Unique Sync Code</span>
-              <span className="text-2xl sm:text-3xl font-mono tracking-widest text-emerald-400">{syncCode}</span>
-              <span className="text-[10px] sm:text-xs text-zinc-500 mt-2 text-center max-w-sm">
-                Enter this code on another device to instantly mirror your current session.
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
-            {/* Generate Code */}
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5 space-y-3 sm:space-y-4 flex flex-col justify-between">
-              <div>
-                <h3 className="text-xs sm:text-sm font-medium text-zinc-300 mb-1">Create New Sync Code</h3>
-                <p className="text-[11px] sm:text-xs text-zinc-500">
-                  Generate a secure 9-character code to share your current session with other devices.
-                </p>
-              </div>
-              <button
-                onClick={onGenerateSyncCode}
-                className="w-full rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-2 text-xs sm:text-sm font-medium hover:bg-emerald-500/20 transition cursor-pointer"
-              >
-                Generate Sync Code
-              </button>
-            </div>
-
-            {/* Join Code */}
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 sm:p-5 space-y-3 sm:space-y-4">
-              <div>
-                <h3 className="text-xs sm:text-sm font-medium text-zinc-300 mb-1">Connect Existing Device</h3>
-                <p className="text-[11px] sm:text-xs text-zinc-500">
-                  Enter a code from another device to sync and override your current local data.
-                </p>
-              </div>
-              <form onSubmit={handleJoinSubmit} className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="XXX-XXX-XXX"
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(formatSyncCodeInput(e.target.value))}
-                  maxLength={11}
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-center font-mono text-zinc-100 outline-none focus:border-emerald-500/50 uppercase tracking-widest text-xs sm:text-sm"
-                />
-                <button
-                  type="submit"
-                  disabled={joinCodeInput.length !== 11}
-                  className="w-full rounded-xl bg-zinc-800 py-2 text-xs sm:text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Sync with Code
-                </button>
-                {joinError && <p className="text-xs text-rose-400 text-center mt-1">{joinError}</p>}
-              </form>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Daily Targets & Real-time Progress */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
-        <div className="mb-4 sm:mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Target className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-400" />
-            <h2 className="font-semibold text-sm sm:text-base text-zinc-200">Daily Study Targets & Live Stats</h2>
-          </div>
-          <span className="text-[10px] sm:text-xs text-zinc-500 hidden sm:inline">Auto-calculated from logged sessions</span>
-        </div>
-
-        <div className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 text-xs">
-          {/* Target 1: Focus Minutes */}
-          <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 space-y-3">
-            <div className="flex justify-between items-center text-zinc-300">
-              <span>Focus Minutes</span>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min="10"
-                  max="1440"
-                  value={dailyTarget.minutes}
-                  onChange={(e) => onUpdateDailyTarget({ ...dailyTarget, minutes: Number(e.target.value) || 60 })}
-                  className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right text-xs text-zinc-100 outline-none"
-                />
-                <span className="text-zinc-500">m</span>
-              </div>
-            </div>
-            <div className="text-zinc-400">
-              Logged today: <strong className="text-zinc-100">{todayStats.focusMinutes}m</strong> / {dailyTarget.minutes}m
-            </div>
-            <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                style={{ width: `${focusPercent}%` }}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* ── Account ────────────────────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <Card>
+              <IOSRow
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                }
+                label={userAuth ? (userAuth.isAnonymous ? 'Guest Account' : userAuth.displayName || userAuth.email || 'Account') : 'Sign In'}
+                subtitle={userAuth ? (userAuth.isAnonymous ? 'Sync across devices with a code' : 'Manage your account') : 'Sign in to sync your data'}
+                onClick={onOpenAuth}
+                showChevron
+                isLast
               />
-            </div>
-          </div>
+            </Card>
+          </motion.div>
 
-          {/* Target 2: Sessions */}
-          <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 space-y-3">
-            <div className="flex justify-between items-center text-zinc-300">
-              <span>Target Sessions</span>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={dailyTarget.sessions}
-                  onChange={(e) => onUpdateDailyTarget({ ...dailyTarget, sessions: Number(e.target.value) || 1 })}
-                  className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right text-xs text-zinc-100 outline-none"
-                />
-                <span className="text-zinc-500">sessions</span>
-              </div>
-            </div>
-            <div className="text-zinc-400">
-              Completed today: <strong className="text-zinc-100">{todayStats.sessions}</strong> / {dailyTarget.sessions}
-            </div>
-            <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                style={{ width: `${sessionPercent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Target 3: Max Distractions */}
-          <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4 space-y-3">
-            <div className="flex justify-between items-center text-zinc-300">
-              <span>Max Distractions</span>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={dailyTarget.maxDistractions}
-                  onChange={(e) => onUpdateDailyTarget({ ...dailyTarget, maxDistractions: Number(e.target.value) || 0 })}
-                  className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right text-xs text-zinc-100 outline-none"
-                />
-                <span className="text-zinc-500">max</span>
-              </div>
-            </div>
-            <div className="text-zinc-400">
-              Logged today: <strong className="text-zinc-100">{todayStats.distractions}</strong> / max {dailyTarget.maxDistractions}
-            </div>
-            <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  todayStats.distractions > dailyTarget.maxDistractions ? 'bg-rose-500' : 'bg-amber-500'
-                }`}
-                style={{ width: `${distractionPercent}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Grid: Timer Durations & Audio Notifications */}
-      <div className="grid gap-6 md:grid-cols-2 text-xs">
-        {/* Timer Config */}
-        <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Settings className="h-4 w-4 text-zinc-400" />
-            <h2 className="font-semibold text-zinc-200">Timer Intervals</h2>
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex items-center justify-between text-zinc-300">
-              <span>Focus Block (minutes)</span>
-              <input
-                type="number"
-                min="1"
-                max="180"
-                value={settings.focusMinutes}
-                onChange={(e) => onUpdateSettings({ ...settings, focusMinutes: Math.max(1, Number(e.target.value)) })}
-                className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right outline-none"
-              />
-            </label>
-
-            <label className="flex items-center justify-between text-zinc-300">
-              <span>Short Break (minutes)</span>
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={settings.breakMinutes}
-                onChange={(e) => onUpdateSettings({ ...settings, breakMinutes: Math.max(1, Number(e.target.value)) })}
-                className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right outline-none"
-              />
-            </label>
-
-            <label className="flex items-center justify-between text-zinc-300">
-              <span>Long Break (minutes)</span>
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={settings.longBreakMinutes}
-                onChange={(e) => onUpdateSettings({ ...settings, longBreakMinutes: Math.max(1, Number(e.target.value)) })}
-                className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right outline-none"
-              />
-            </label>
-
-            <label className="flex items-center justify-between text-zinc-300 border-t border-zinc-800/60 pt-3">
-              <span>Sessions before Long Break</span>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={settings.sessionsBeforeLongBreak}
-                onChange={(e) => onUpdateSettings({ ...settings, sessionsBeforeLongBreak: Math.max(1, Number(e.target.value)) })}
-                className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right outline-none"
-              />
-            </label>
-          </div>
-        </section>
-
-        {/* Audio Sound Chimes & Web Notifications */}
-        <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Volume2 className="h-4 w-4 text-zinc-400" />
-            <h2 className="font-semibold text-zinc-200">Audio Chimes & Push Alerts</h2>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-zinc-400 mb-1">Completion Bell Sound</label>
-              <div className="flex gap-2">
-                <select
-                  value={settings.sound}
-                  onChange={(e) => {
-                    const nextSound = e.target.value;
-                    onUpdateSettings({ ...settings, sound: nextSound });
-                    playSound(nextSound, settings.volume);
-                  }}
-                  className="flex-grow rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 outline-none text-zinc-200"
-                >
-                  {SOUND_NAMES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={() => playSound(settings.sound, settings.volume)}
-                  className="flex items-center gap-1 rounded bg-zinc-800 px-3 py-1.5 text-zinc-300 hover:bg-zinc-700 hover:text-white"
-                >
-                  <Play className="h-3.5 w-3.5" />
-                  <span>Test</span>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-zinc-400 mb-1">
-                <span>Volume</span>
-                <span>{Math.round(settings.volume * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={settings.volume}
-                onChange={(e) => onUpdateSettings({ ...settings, volume: Number(e.target.value) })}
-                className="w-full accent-zinc-400"
-              />
-            </div>
-
-            <div className="border-t border-zinc-800/60 pt-3 space-y-2">
-              <label className="flex items-center justify-between text-zinc-300 cursor-pointer">
-                <span>Web Push Notifications</span>
-                <button
-                  type="button"
-                  onClick={handleToggleNotifications}
-                  className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                    settings.enableNotifications
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                      : 'bg-zinc-800 text-zinc-400'
-                  }`}
-                >
-                  {settings.enableNotifications ? 'Enabled' : 'Disabled'}
-                </button>
-              </label>
-
-              <label className="flex items-center justify-between text-zinc-300 cursor-pointer">
-                <span>Auto-start Break Sessions</span>
-                <input
-                  type="checkbox"
-                  checked={settings.autoStartBreaks}
-                  onChange={(e) => onUpdateSettings({ ...settings, autoStartBreaks: e.target.checked })}
-                  className="accent-zinc-400"
-                />
-              </label>
-
-              <label className="flex items-center justify-between text-zinc-300 cursor-pointer group">
-                <div className="flex flex-col">
-                  <span>Strict Mode</span>
-                  <span className="text-[10px] text-zinc-500 max-w-[200px] leading-tight mt-0.5">
-                    Automatically pauses timer and records distraction if you leave the app while focusing.
-                  </span>
+          {/* ── Timer Settings ─────────────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <SectionHeader title="Timer" />
+            <Card>
+              {/* Focus Duration */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40">
+                <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 text-white" />
                 </div>
+                <span className="flex-1 text-[15px] text-white">Focus Duration</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={settings.focusDuration}
+                    onChange={(e) => onUpdateSettings({ ...settings, focusDuration: Number(e.target.value) || 25 })}
+                    className="w-14 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
+                  />
+                  <span className="text-[13px] text-zinc-500 w-6">min</span>
+                </div>
+              </div>
+              {/* Short Break */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40">
+                <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Coffee className="w-4 h-4 text-white" />
+                </div>
+                <span className="flex-1 text-[15px] text-white">Short Break</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={settings.breakDuration}
+                    onChange={(e) => onUpdateSettings({ ...settings, breakDuration: Number(e.target.value) || 5 })}
+                    className="w-14 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
+                  />
+                  <span className="text-[13px] text-zinc-500 w-6">min</span>
+                </div>
+              </div>
+              {/* Long Break */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40">
+                <div className="w-8 h-8 rounded-lg bg-purple-500 flex items-center justify-center flex-shrink-0">
+                  <RotateCcw className="w-4 h-4 text-white" />
+                </div>
+                <span className="flex-1 text-[15px] text-white">Long Break</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={settings.longBreakDuration}
+                    onChange={(e) => onUpdateSettings({ ...settings, longBreakDuration: Number(e.target.value) || 15 })}
+                    className="w-14 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
+                  />
+                  <span className="text-[13px] text-zinc-500 w-6">min</span>
+                </div>
+              </div>
+              {/* Sessions Before Long Break */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center flex-shrink-0">
+                  <Hash className="w-4 h-4 text-white" />
+                </div>
+                <span className="flex-1 text-[15px] text-white">Sessions Before Long Break</span>
                 <input
-                  type="checkbox"
-                  checked={settings.strictMode || false}
-                  onChange={(e) => onUpdateSettings({ ...settings, strictMode: e.target.checked })}
-                  className="accent-rose-500 h-4 w-4"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={settings.sessionsBeforeLongBreak}
+                  onChange={(e) => onUpdateSettings({ ...settings, sessionsBeforeLongBreak: Number(e.target.value) || 4 })}
+                  className="w-12 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
                 />
-              </label>
-            </div>
-          </div>
-        </section>
-      </div>
+              </div>
+            </Card>
+          </motion.div>
 
-      {/* Offline PWA & Storage Details */}
-      <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm text-xs space-y-2 text-zinc-400">
-        <div className="flex items-center gap-2 font-medium text-zinc-200">
-          {isOnline ? <Cloud className="h-4 w-4 text-emerald-400" /> : <HardDrive className="h-4 w-4 text-amber-400" />}
-          <span>PWA Offline Persistence Status</span>
-        </div>
-        <p>
-          {isOnline
-            ? 'Connected to Google Cloud Run and Firestore. Offline cached reads and writes enabled.'
-            : 'Working offline without an active internet connection. All session data, tasks, and timetables are saved locally in IndexedDB and will automatically sync when back online.'}
-        </p>
-      </section>
+          {/* ── Behavior ───────────────────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <SectionHeader title="Behavior" />
+            <Card>
+              <IOSRow
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                }
+                label="Auto-Start Breaks"
+                subtitle="Automatically start break after focus"
+                isLast={false}
+              >
+                <IOSToggle value={settings.autoStartBreaks} onToggle={() => onUpdateSettings({ ...settings, autoStartBreaks: !settings.autoStartBreaks })} />
+              </IOSRow>
+              <IOSRow
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                }
+                label="Auto-Start Focus"
+                subtitle="Automatically start next focus session"
+                isLast={false}
+              >
+                <IOSToggle value={settings.autoStartFocus} onToggle={() => onUpdateSettings({ ...settings, autoStartFocus: !settings.autoStartFocus })} />
+              </IOSRow>
+              <IOSRow
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-rose-500 flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-4 h-4 text-white" />
+                  </div>
+                }
+                label="Strict Mode"
+                subtitle="Log distractions during focus"
+                isLast
+              >
+                <IOSToggle value={settings.strictMode} onToggle={() => onUpdateSettings({ ...settings, strictMode: !settings.strictMode })} />
+              </IOSRow>
+            </Card>
+          </motion.div>
+
+          {/* ── Sound & Notifications ──────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <SectionHeader title="Sound & Notifications" />
+            <Card>
+              {/* Sound selector */}
+              <div className="px-4 py-3 border-b border-zinc-800/40">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
+                    <Volume2 className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="flex-1 text-[15px] text-white">Sound</span>
+                  <select
+                    value={settings.sound}
+                    onChange={(e) => onUpdateSettings({ ...settings, sound: e.target.value })}
+                    className="bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-1.5 text-[13px] text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none pr-7"
+                  >
+                    {SOUND_NAMES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-3 pl-11">
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={settings.volume}
+                    onChange={(e) => onUpdateSettings({ ...settings, volume: Number(e.target.value) })}
+                    className="flex-1 accent-blue-500 h-1"
+                  />
+                  <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => playSound(settings.sound, settings.volume)}
+                    className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 active:bg-zinc-700 transition-colors"
+                  >
+                    <Play className="w-3 h-3 ml-0.5" />
+                  </motion.button>
+                </div>
+              </div>
+              {/* Notifications */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] text-white">Notifications</div>
+                  <div className="text-[13px] text-zinc-500">
+                    {notifStatus === 'granted' ? 'Enabled' : notifStatus === 'denied' ? 'Blocked' : 'Not enabled'}
+                  </div>
+                </div>
+                {notifStatus !== 'granted' ? (
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    onClick={handleRequestNotifs}
+                    className="px-3.5 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-[13px] font-medium active:bg-blue-500/30 transition-colors"
+                  >
+                    Enable
+                  </motion.button>
+                ) : (
+                  <IOSToggle
+                    value={settings.enableNotifications}
+                    onToggle={() => onUpdateSettings({ ...settings, enableNotifications: !settings.enableNotifications })}
+                  />
+                )}
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* ── Today's Progress ───────────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <SectionHeader title="Today's Progress" />
+            <div className="grid grid-cols-3 gap-3">
+              {/* Sessions */}
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-4 flex flex-col items-center"
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center mb-2">
+                  <Target className="w-4 h-4 text-blue-400" />
+                </div>
+                <span className="text-2xl font-bold text-white tabular-nums">{todayStats.sessions}</span>
+                <span className="text-[11px] text-zinc-500 mt-0.5">Sessions</span>
+                <div className="w-full h-1 rounded-full bg-zinc-800 mt-2 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${sessionPercent}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    className="h-full bg-blue-500 rounded-full"
+                  />
+                </div>
+              </motion.div>
+              {/* Focus Minutes */}
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-4 flex flex-col items-center"
+              >
+                <div className="w-8 h-8 rounded-full bg-green-500/15 flex items-center justify-center mb-2">
+                  <Clock className="w-4 h-4 text-green-400" />
+                </div>
+                <span className="text-2xl font-bold text-white tabular-nums">{todayStats.focusMinutes}</span>
+                <span className="text-[11px] text-zinc-500 mt-0.5">Minutes</span>
+                <div className="w-full h-1 rounded-full bg-zinc-800 mt-2 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${minutesPercent}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    className="h-full bg-green-500 rounded-full"
+                  />
+                </div>
+              </motion.div>
+              {/* Distractions */}
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className="bg-zinc-900/60 backdrop-blur-xl rounded-2xl border border-zinc-800/50 p-4 flex flex-col items-center"
+              >
+                <div className="w-8 h-8 rounded-full bg-amber-500/15 flex items-center justify-center mb-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                </div>
+                <span className="text-2xl font-bold text-white tabular-nums">{todayStats.distractions}</span>
+                <span className="text-[11px] text-zinc-500 mt-0.5">Distractions</span>
+                <div className="w-full h-1 rounded-full bg-zinc-800 mt-2 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${distractionPercent}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    className="h-full bg-amber-500 rounded-full"
+                  />
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          {/* ── Daily Targets ──────────────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <SectionHeader title="Daily Targets" />
+            <Card>
+              {/* Sessions target */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40">
+                <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
+                  <Target className="w-4 h-4 text-white" />
+                </div>
+                <span className="flex-1 text-[15px] text-white">Sessions</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={dailyTarget.sessions}
+                  onChange={(e) => onUpdateDailyTarget({ ...dailyTarget, sessions: Number(e.target.value) || 8 })}
+                  className="w-12 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
+                />
+              </div>
+              {/* Focus minutes target */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/40">
+                <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 text-white" />
+                </div>
+                <span className="flex-1 text-[15px] text-white">Focus Minutes</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={dailyTarget.focusMinutes}
+                  onChange={(e) => onUpdateDailyTarget({ ...dailyTarget, focusMinutes: Number(e.target.value) || 120 })}
+                  className="w-14 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
+                />
+              </div>
+              {/* Max distractions target */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-4 h-4 text-white" />
+                </div>
+                <span className="flex-1 text-[15px] text-white">Max Distractions</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={dailyTarget.maxDistractions}
+                  onChange={(e) => onUpdateDailyTarget({ ...dailyTarget, maxDistractions: Number(e.target.value) || 5 })}
+                  className="w-12 text-right bg-transparent text-[15px] text-white focus:outline-none tabular-nums"
+                />
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* ── Device Sync ────────────────────────────────────── */}
+          <motion.div variants={sectionVariants} className="mb-7">
+            <SectionHeader title="Device Sync" />
+            <Card className="p-5">
+              {/* Status indicator */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                  {isOnline ? (
+                    <Wifi className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <WifiOff className="w-5 h-5 text-zinc-500" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-[15px] font-medium text-white">
+                    {syncCode ? 'Connected' : 'Not Connected'}
+                  </div>
+                  <div className="text-[13px] text-zinc-500">
+                    {isOnline ? 'Online' : 'Offline'} — Sync data across devices
+                  </div>
+                </div>
+              </div>
+
+              {/* Active sync code display */}
+              {syncCode && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4"
+                >
+                  <div className="bg-zinc-800/50 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Your Sync Code</div>
+                      <div className="text-lg font-mono font-semibold text-white tracking-widest">{syncCode}</div>
+                    </div>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleCopyCode}
+                      className="w-9 h-9 rounded-full bg-zinc-700/50 flex items-center justify-center text-zinc-400 active:bg-zinc-700 transition-colors"
+                    >
+                      <AnimatePresence mode="wait">
+                        {copied ? (
+                          <motion.div key="check" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                            <Check className="w-4 h-4 text-green-400" />
+                          </motion.div>
+                        ) : (
+                          <motion.div key="copy" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                            <Copy className="w-4 h-4" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.button>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={onDisconnectSyncCode}
+                    className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 text-red-400 text-[13px] font-medium active:bg-red-500/20 transition-colors"
+                  >
+                    <Unlink className="w-3.5 h-3.5" />
+                    Disconnect
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* Join code input */}
+              {!syncCode && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      placeholder="Enter code"
+                      className="flex-1 bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-2.5 text-[15px] text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono tracking-wider uppercase"
+                    />
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={async () => {
+                        if (joinCode.trim()) {
+                          const ok = await onJoinSyncCode(joinCode.trim());
+                          if (ok) setJoinCode('');
+                        }
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-blue-500 text-white text-[13px] font-semibold active:bg-blue-600 transition-colors flex items-center gap-1.5"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Join
+                    </motion.button>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={onGenerateSyncCode}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 text-[13px] font-medium active:bg-emerald-500/25 transition-colors"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Generate New Code
+                  </motion.button>
+                </div>
+              )}
+            </Card>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 };

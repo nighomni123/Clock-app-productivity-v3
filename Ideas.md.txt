@@ -1,0 +1,27 @@
+Yes — based on everything I've seen in the codebase, here are my concrete proposals, grouped by impact:
+
+## 🚀 Quick wins (small effort, noticeable polish)
+
+1. **Tab-title countdown** — While the focus timer runs, mirror `MM:SS` into `document.title` so you can see time left even when the tab is backgrounded. ~10 lines in `FocusWorkspace.tsx`.
+2. **Live journal timer ("start now")** — The single biggest remaining friction killer: one tap starts a running entry, one tap stops it and saves with real duration. Pairs with a "continue last entry" button. This is Toggl-style and directly addresses your journal complaint.
+3. **Zero-duration guard** — Journal entries created live start with `endTime === startTime`; right now they'd show as "0 min" until edited. Guard the display and show a pulsing "recording" state instead.
+4. **Haptic feedback** — `navigator.vibrate(10)` on quick-entry taps for a real iOS feel on mobile.
+5. **PWA icons** — `public/manifest.json` has no `icons` array, so "Add to Home Screen" gets a blank icon. Adding a 192/512px icon pair completes the iOS-app feel.
+
+## 📈 Medium effort (new value)
+
+6. **Code-splitting** — The build warned about a 1.18MB single chunk. Lazy-load `ActivityJournal`, `SettingsStats`, and `AuthModal` with `React.lazy` + a `manualChunks` split for Firebase. Cuts initial load roughly in half.
+7. **Weekly review screen** — The journal already tracks everything; add a simple stats tab: hours per day bar chart, category breakdown, GitHub-style streak heatmap. All derivable from existing `activity_logs` with no schema changes.
+8. **Ambient sound mixer** — Extend `lib/audio.ts` with loopable Web Audio backgrounds (rain, café, brown noise) that run only during focus mode.
+9. **Floating mini-timer** — A Dynamic-Island-style pill that stays visible when you navigate to Tasks/Journal mid-session, so you never lose track of a running timer.
+10. **Guest → Google account data merge** — Currently upgrading from an anonymous session to Google sign-in likely orphans the anonymous data. A one-time migration copy of `daily/`, `tasks/`, `activity_logs` docs would make sign-in genuinely worthwhile.
+
+## 🏗️ Bigger bets
+
+11. **Natural-language journal entry** — Type "Physics 2h" or "gym 7-8pm" and parse it into a structured entry. Zero-friction logging.
+12. **Real test suite** — The project has none. Vitest + React Testing Library for the timer state machine (completion, break rotation, strict mode) and journal math would protect all the recent refactoring. Plus a GitHub Actions CI that runs `lint` + `build`.
+13. **Background focus-end notifications** — Since the timetable reminders were removed, the timer notification only fires when the page is open. A lightweight FCM/Service Worker push path would notify you even with the tab closed.
+
+My recommended order if you want me to start: **#2 → #1 → #6 → #7** (journal live timer, tab countdown, bundle split, weekly stats) — that sequence maximizes daily-use value for minimal risk.
+
+Want me to implement any of these? I can take the whole quick-wins batch in one pass right now.

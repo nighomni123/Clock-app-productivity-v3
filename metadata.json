@@ -1,6 +1,6 @@
 {
   "name": "Remix Focus Study Clock",
-  "description": "Study productivity app with timetable sessions, task queue, Firestore sync, push notifications, Google Calendar integration, and offline support.",
+  "description": "Study productivity app with focus sessions, task queue, Firestore sync, push notifications, Google Calendar integration, and offline support.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

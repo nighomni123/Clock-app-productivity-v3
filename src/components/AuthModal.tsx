@@ -111,7 +111,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, userAuth 
                   <span>Continue Session on Different Devices</span>
                 </div>
                 <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  You are currently using an <strong>Anonymous Guest session</strong>. Sign in with Google to preserve all your timetable blocks, daily tasks, and custom settings across all mobile, tablet, and desktop devices!
+                  You are currently using an <strong>Anonymous Guest session</strong>. Sign in with Google to preserve all your study sessions, daily tasks, and custom settings across all mobile, tablet, and desktop devices!
                 </p>
                 <button
                   onClick={handleGoogleSignIn}

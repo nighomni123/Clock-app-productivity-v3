@@ -9,7 +9,6 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Navbar } from './components/Navbar';
 import { ClockView } from './components/ClockView';
 import { FocusWorkspace } from './components/FocusWorkspace';
-import { TimetableCalendar } from './components/TimetableCalendar';
 import { TaskQueue } from './components/TaskQueue';
 import { SettingsStats } from './components/SettingsStats';
 import { AuthModal } from './components/AuthModal';
@@ -18,7 +17,6 @@ import {
   UserSettings,
   ExamState,
   TaskItem,
-  TimetableBlock,
   DistractionItem,
   StudySession,
   DailyTarget,
@@ -43,7 +41,7 @@ import {
   onAuthStateChanged,
   signInAnonymouslyUser
 } from './lib/firebase';
-import { checkUpcomingStudyBlocks } from './lib/notifications';
+
 
 const DEFAULT_SETTINGS: UserSettings = {
   focusMinutes: 25,
@@ -55,7 +53,6 @@ const DEFAULT_SETTINGS: UserSettings = {
   autoStartBreaks: false,
   autoStartFocus: false,
   enableNotifications: true,
-  notificationLeadMinutes: 5,
   strictMode: false
 };
 
@@ -84,7 +81,6 @@ export default function App() {
   const [exam, setExam] = useState<ExamState>({ name: '', date: '' });
   const [intention, setIntention] = useState<string>('');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [timetables, setTimetables] = useState<TimetableBlock[]>([]);
   const [distractions, setDistractions] = useState<DistractionItem[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<string>('');
@@ -161,7 +157,6 @@ export default function App() {
         if (data.exam) setExam(data.exam);
         if (data.intention !== undefined) setIntention(data.intention);
         if (data.tasks) setTasks(data.tasks);
-        if (data.timetables) setTimetables(data.timetables);
         if (data.distractions) setDistractions(data.distractions);
         if (data.activityLogs) setActivityLogs(data.activityLogs);
         if (data.notes) setNotes(data.notes);
@@ -263,27 +258,6 @@ export default function App() {
     return () => unsubscribe();
   }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Sync Timetables from Firestore (Visibility-Aware)
-  useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
-    const timetablesRef = collection(db, 'timetables');
-    const q = query(timetablesRef, where('userId', '==', userAuth.uid));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const loadedBlocks: TimetableBlock[] = [];
-        snapshot.forEach((docSnap) => {
-          loadedBlocks.push({ id: docSnap.id, ...docSnap.data() } as TimetableBlock);
-        });
-        setTimetables(loadedBlocks);
-      },
-      (err) => handleFirestoreError(err, 'read', 'timetables')
-    );
-
-    return () => unsubscribe();
-  }, [userAuth?.uid, syncCode, isTabVisible]);
-
   // Sync Activity Logs from Firestore (Visibility-Aware)
   useEffect(() => {
     if (!isTabVisible || syncCode || !userAuth?.uid) return;
@@ -324,19 +298,6 @@ export default function App() {
     return () => unsubscribe();
   }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Periodic Study Block Notification Inspector (runs every 30 seconds)
-  useEffect(() => {
-    if (!settings.enableNotifications || !timetables.length) return;
-    const interval = setInterval(() => {
-      checkUpcomingStudyBlocks(timetables, settings.notificationLeadMinutes || 5);
-    }, 30000);
-
-    // Initial check
-    checkUpcomingStudyBlocks(timetables, settings.notificationLeadMinutes || 5);
-
-    return () => clearInterval(interval);
-  }, [timetables, settings.enableNotifications, settings.notificationLeadMinutes]);
-
   const updateSyncDoc = async (code: string, updates: any) => {
     try {
       await setDoc(doc(db, 'sync_sessions', code), { ...updates, updatedAt: Date.now() }, { merge: true });
@@ -361,7 +322,6 @@ export default function App() {
         exam,
         intention,
         tasks,
-        timetables,
         distractions,
         notes,
         dailyTarget,
@@ -618,53 +578,7 @@ export default function App() {
     [syncCode]
   );
 
-  const handleAddTimetableBlock = useCallback(
-    async (blockData: Omit<TimetableBlock, 'id' | 'userId' | 'createdAt'>) => {
-      const newBlock = {
-        ...blockData,
-        id: Math.random().toString(36).substring(2, 10),
-        userId: userAuth?.uid || 'anonymous',
-        createdAt: Date.now()
-      };
 
-      if (syncCode) {
-        setTimetables((prev) => {
-          const next = [...prev, newBlock];
-          updateSyncDoc(syncCode, { timetables: next });
-          return next;
-        });
-        return;
-      }
-
-      if (!userAuth?.uid) return;
-      try {
-        await addDoc(collection(db, 'timetables'), newBlock);
-      } catch (err) {
-        console.warn('Error adding timetable block:', err);
-      }
-    },
-    [userAuth?.uid, syncCode]
-  );
-
-  const handleRemoveTimetableBlock = useCallback(
-    async (id: string) => {
-      if (syncCode) {
-        setTimetables((prev) => {
-          const next = prev.filter((b) => b.id !== id);
-          updateSyncDoc(syncCode, { timetables: next });
-          return next;
-        });
-        return;
-      }
-
-      try {
-        await deleteDoc(doc(db, 'timetables', id));
-      } catch (err) {
-        console.warn('Error deleting timetable block:', err);
-      }
-    },
-    [syncCode]
-  );
 
   const handleLogDistraction = useCallback(
     async (text: string, sessionGoal: string, durationSeconds?: number) => {
@@ -900,29 +814,6 @@ export default function App() {
             distractionLog={distractions}
             onLogDistraction={handleLogDistraction}
             onLogCompletedSession={handleLogCompletedSession}
-            // New handlers for journal integration: create an ActivityLog when session starts and update when paused/finished
-            onStartSessionLog={async (startTime: number, title?: string) => {
-              const id = await handleAddActivityLog({
-                title: title || intention || 'Focus Session',
-                category: 'Work',
-                startTime: startTime,
-                endTime: startTime,
-                rating: 5
-              });
-              return id;
-            }}
-            onUpdateSessionLog={async (id: string, endTime: number) => {
-              await handleUpdateActivityLog(id, { endTime });
-            }}
-          />
-        )}
-
-        {activeTab === 'timetable' && (
-          <TimetableCalendar
-            blocks={timetables}
-            onAddBlock={handleAddTimetableBlock}
-            onRemoveBlock={handleRemoveTimetableBlock}
-            notificationLeadMinutes={settings.notificationLeadMinutes}
           />
         )}
 

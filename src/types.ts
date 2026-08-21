@@ -8,7 +8,6 @@ export interface UserSettings {
   autoStartBreaks: boolean;
   autoStartFocus: boolean;
   enableNotifications: boolean;
-  notificationLeadMinutes: number;
   strictMode: boolean;
 }
 
@@ -26,19 +25,6 @@ export interface TaskItem {
   dueDate?: string;
   priority: 'high' | 'medium' | 'low';
   estimatedMinutes?: number;
-  createdAt: number;
-}
-
-export interface TimetableBlock {
-  id: string;
-  userId: string;
-  title: string;
-  subject: string;
-  dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
-  startTime: string; // HH:mm format
-  endTime: string;   // HH:mm format
-  location?: string;
-  color: string;
   createdAt: number;
 }
 
