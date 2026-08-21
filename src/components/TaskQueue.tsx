@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { CheckSquare, Plus, Trash2, CalendarPlus, Check, Clock, AlertCircle } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { CheckSquare, Plus, Trash2, Check, Clock, Upload, FileSpreadsheet, X, Download, AlertCircle, Loader2, Play } from 'lucide-react';
 import { TaskItem } from '../types';
-import { createGCalLinkForTask } from '../lib/gcal';
+import { IMPORT_ACCEPT, IMPORT_COLUMNS, SAMPLE_CSV, parseTasksFile } from '../lib/taskImport';
 
 interface TaskQueueProps {
   tasks: TaskItem[];
   onAddTask: (task: Omit<TaskItem, 'id' | 'userId' | 'createdAt'>) => void;
   onToggleTask: (id: string) => void;
   onRemoveTask: (id: string) => void;
+  onImportTasks: (tasks: Array<Omit<TaskItem, 'id' | 'userId' | 'createdAt'>>) => Promise<number>;
   onStartFocusForTask: (taskTitle: string) => void;
 }
 
@@ -16,6 +17,7 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
   onAddTask,
   onToggleTask,
   onRemoveTask,
+  onImportTasks,
   onStartFocusForTask
 }) => {
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -23,6 +25,15 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(30);
+
+  // Import dialog state
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({
+    type: 'idle',
+    message: ''
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +58,47 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
 
   const completedCount = tasks.filter((t) => t.complete).length;
 
+  const openImportDialog = () => {
+    setImportStatus({ type: 'idle', message: '' });
+    setIsImportOpen(true);
+  };
+
+  const handleImportFile = async (file: File | undefined) => {
+    if (!file) return;
+    setIsImporting(true);
+    setImportStatus({ type: 'idle', message: '' });
+    try {
+      const { drafts, skippedRows } = await parseTasksFile(file);
+      const added = await onImportTasks(drafts);
+      setImportStatus({
+        type: 'success',
+        message: `Imported ${added} task${added === 1 ? '' : 's'}${
+          skippedRows > 0 ? `, skipped ${skippedRows} invalid row${skippedRows === 1 ? '' : 's'}` : ''
+        }.`
+      });
+    } catch (err) {
+      setImportStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to import the file. Please check the format and try again.'
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const downloadSampleCsv = () => {
+    const blob = new Blob([SAMPLE_CSV], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'daily_tasks_sample.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="mx-auto w-full max-w-5xl animate-in fade-in zoom-in-95 duration-500">
       {/* Header Banner */}
@@ -57,7 +109,7 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
             <h1 className="text-lg sm:text-xl font-semibold text-zinc-100">Daily Study Task Queue</h1>
           </div>
           <p className="mt-1 text-xs text-zinc-400">
-            Organize daily tasks by priority, sync completed items to Firestore, and schedule on Google Calendar.
+            Organize daily tasks by priority, sync completed items to Firestore, and jump straight into a focus session.
           </p>
         </div>
 
@@ -71,7 +123,17 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
 
       {/* Task Creation Form */}
       <section className="mb-6 sm:mb-8 rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
-        <h2 className="text-xs sm:text-sm font-medium text-zinc-200 mb-3 sm:mb-4">Add Daily Study Task</h2>
+        <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xs sm:text-sm font-medium text-zinc-200">Add Daily Study Task</h2>
+          <button
+            type="button"
+            onClick={openImportDialog}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span>Import CSV / Excel</span>
+          </button>
+        </div>
         <form onSubmit={handleCreateTask} className="grid gap-2.5 sm:grid-cols-12">
           <input
             type="text"
@@ -136,7 +198,6 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
           </div>
         ) : (
           filteredTasks.map((task) => {
-            const gcalUrl = createGCalLinkForTask(task);
             return (
               <div
                 key={task.id}
@@ -196,17 +257,6 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
                     </button>
                   )}
 
-                  <a
-                    href={gcalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 rounded-lg border border-indigo-900/40 bg-indigo-950/30 px-3 py-1.5 text-xs text-indigo-300 hover:bg-indigo-950/60 transition"
-                    title="Add to Google Calendar"
-                  >
-                    <CalendarPlus className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Calendar</span>
-                  </a>
-
                   <button
                     onClick={() => onRemoveTask(task.id)}
                     className="p-1.5 text-zinc-500 hover:text-red-400 transition"
@@ -220,6 +270,120 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
           })
         )}
       </div>
+
+      {/* Import CSV / Excel Dialog */}
+      {isImportOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Import tasks from CSV or Excel"
+        >
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h2 className="text-base sm:text-lg font-medium text-zinc-100 flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
+                Import Daily Tasks
+              </h2>
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className="text-zinc-500 hover:text-zinc-300 transition p-1"
+                aria-label="Close import dialog"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Upload a <strong className="text-zinc-200">.csv</strong>, <strong className="text-zinc-200">.xlsx</strong> or{' '}
+              <strong className="text-zinc-200">.xls</strong> file. For Excel files the first sheet is read. The first row must be a header row with at least a{' '}
+              <code className="rounded bg-zinc-950 border border-zinc-800 px-1 py-0.5 text-[10px] text-emerald-300">title</code> column.
+            </p>
+
+            {/* CSV Format Specification */}
+            <div className="rounded-2xl border border-zinc-800 bg-black/40 p-3.5 sm:p-4 space-y-2.5">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Required CSV format (comma-separated)</span>
+              <pre className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-[10px] sm:text-[11px] leading-relaxed text-zinc-300 overflow-x-auto no-scrollbar">{SAMPLE_CSV}</pre>
+              <ul className="space-y-1.5 text-[11px] text-zinc-400">
+                {IMPORT_COLUMNS.map((col) => (
+                  <li key={col.key} className="flex flex-wrap items-baseline gap-x-1.5">
+                    <code className="rounded bg-zinc-950 border border-zinc-800 px-1 py-0.5 text-[10px] text-emerald-300">{col.key}</code>
+                    {col.required ? (
+                      <span className="text-rose-400/90 font-medium">required</span>
+                    ) : (
+                      <span className="text-zinc-600">optional —</span>
+                    )}
+                    <span>{col.description}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* File Picker */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={IMPORT_ACCEPT}
+              className="hidden"
+              onChange={(e) => handleImportFile(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-2.5 text-xs sm:text-sm font-medium hover:bg-emerald-500/20 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Importing…</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  <span>Choose File & Import</span>
+                </>
+              )}
+            </button>
+
+            {importStatus.type !== 'idle' && (
+              <div
+                className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs ${
+                  importStatus.type === 'success'
+                    ? 'border-emerald-900/50 bg-emerald-950/30 text-emerald-300'
+                    : 'border-rose-900/50 bg-rose-950/30 text-rose-300'
+                }`}
+                role="status"
+              >
+                {importStatus.type === 'success' ? (
+                  <Check className="h-4 w-4 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                )}
+                <span>{importStatus.message}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+              <button
+                type="button"
+                onClick={downloadSampleCsv}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download Sample CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsImportOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

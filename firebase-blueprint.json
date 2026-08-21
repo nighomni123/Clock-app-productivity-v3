@@ -14,23 +14,6 @@
       },
       "required": ["uid", "createdAt"]
     },
-    "timetables": {
-      "title": "Timetable Entries",
-      "description": "Scheduled study blocks across the week",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "title": { "type": "string" },
-        "dayOfWeek": { "type": "string" },
-        "startTime": { "type": "string" },
-        "endTime": { "type": "string" },
-        "subject": { "type": "string" },
-        "location": { "type": "string" },
-        "color": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["userId", "title", "dayOfWeek", "startTime", "endTime"]
-    },
     "sessions": {
       "title": "Study Sessions",
       "description": "Completed or logged study blocks",
@@ -123,10 +106,6 @@
     "tasks/{taskId}": {
       "schema": "tasks",
       "description": "User tasks"
-    },
-    "timetables/{blockId}": {
-      "schema": "timetables",
-      "description": "User scheduled timetable blocks"
     },
     "notes/{userId}": {
       "schema": "notes",

@@ -12,6 +12,8 @@ interface FocusWorkspaceProps {
   onAddTask: (title: string) => void;
   onToggleTask: (id: string) => void;
   onRemoveTask: (id: string) => void;
+  onStartFocusForTask?: (taskTitle: string) => void;
+  focusStartRequest?: { topic: string; ts: number } | null;
   notes: string;
   onUpdateNotes: (notes: string) => void;
   distractionLog: DistractionItem[];
@@ -41,11 +43,15 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   onAddTask,
   onToggleTask,
   onRemoveTask,
+  onStartFocusForTask,
+  focusStartRequest,
   notes,
   onUpdateNotes,
   distractionLog,
   onLogDistraction,
-  onLogCompletedSession
+  onLogCompletedSession,
+  onStartSessionLog,
+  onUpdateSessionLog
 }) => {
   const [mode, setMode] = useState<'focus' | 'break' | 'longBreak'>('focus');
   const [isRunning, setIsRunning] = useState(false);
@@ -74,6 +80,34 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const timeLeftRef = useRef(timeLeft);
   useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
 
+  // Open a journal segment (Work entry) for a running focus block. The entry starts
+  // now and its endTime is updated to the real stop moment, so it always reflects
+  // the actual time the focus timer was counting down — not the configured length.
+  const openJournalSegment = useCallback(
+    (title?: string) => {
+      if (typeof onStartSessionLog !== 'function') return;
+      Promise.resolve()
+        .then(() => onStartSessionLog(Date.now(), title || intention || 'Focus Session'))
+        .then((id) => {
+          if (typeof id === 'string') sessionLogIdRef.current = id;
+        })
+        .catch(() => {});
+    },
+    [intention, onStartSessionLog]
+  );
+
+  // Close the active journal segment, stamping its endTime to now (actual elapsed time)
+  const closeJournalSegment = useCallback(() => {
+    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
+      try {
+        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
+      } catch (e) {
+        // non-fatal
+      }
+      sessionLogIdRef.current = null;
+    }
+  }, [onUpdateSessionLog]);
+
   useEffect(() => {
     if (!settings.strictMode) return;
 
@@ -85,49 +119,34 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
           setTimeLeft(remaining);
           setIsRunning(false);
 
-          // Update the active activity log endTime to now (pausing the journal segment)
-          if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-            try {
-              onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-            } catch (e) {
-              // non-fatal
-            }
-            sessionLogIdRef.current = null;
-          }
+          // Pause the journal segment while the app is hidden
+          closeJournalSegment();
         }
       } else {
         if (strictModePausedAtRef.current !== null) {
           const durationMs = Date.now() - strictModePausedAtRef.current;
           const durationSeconds = Math.round(durationMs / 1000);
-          
+
           if (durationSeconds >= 1) {
             onLogDistraction('Strict Mode: App sent to background', intention || 'General Study', durationSeconds);
             setStrictAlert({ durationSeconds });
             setTimeout(() => setStrictAlert(null), 5000);
           }
-          
+
           strictModePausedAtRef.current = null;
           completionLockRef.current = false;
           endTimeRef.current = Date.now() + timeLeftRef.current;
           setIsRunning(true);
 
           // Start a new activity log segment for resumed focus
-          if (typeof onStartSessionLog === 'function') {
-            // don't await to avoid delaying UI
-            Promise.resolve()
-              .then(() => onStartSessionLog(Date.now(), intention || 'Focus Session'))
-              .then((id) => {
-                if (typeof id === 'string') sessionLogIdRef.current = id;
-              })
-              .catch(() => {});
-          }
+          openJournalSegment();
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [settings.strictMode, intention, onLogDistraction]);
+  }, [settings.strictMode, intention, onLogDistraction, openJournalSegment, closeJournalSegment]);
 
   const durationForMode = useCallback(
     (m: 'focus' | 'break' | 'longBreak') => {
@@ -148,9 +167,14 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
       completionLockRef.current = false;
       if (autoStart) {
         endTimeRef.current = Date.now() + duration;
+        // Auto-started focus blocks (e.g. Auto-start Focus setting) are journaled too
+        if (nextMode === 'focus') openJournalSegment();
+      } else if (isRunningRef.current) {
+        // Manually switching modes while a segment is running ends that focus segment
+        closeJournalSegment();
       }
     },
-    [durationForMode]
+    [durationForMode, openJournalSegment, closeJournalSegment]
   );
 
   useEffect(() => {
@@ -160,6 +184,27 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
     setTimeLeft(duration);
   }, [settings, mode, isRunning, durationForMode]);
 
+  // Auto-start a focus session when a task's "Start Focus" action is triggered (Task Queue / sidebar)
+  const lastHandledStartTsRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusStartRequest || focusStartRequest.ts === lastHandledStartTsRef.current) return;
+    lastHandledStartTsRef.current = focusStartRequest.ts;
+
+    // Close any open journal segment before restarting with the new topic
+    closeJournalSegment();
+
+    const duration = durationForMode('focus');
+    setMode('focus');
+    setSessionDuration(duration);
+    setTimeLeft(duration);
+    completionLockRef.current = false;
+    endTimeRef.current = Date.now() + duration;
+    setIsRunning(true);
+
+    // Start a journal entry for this focus segment (actual countdown time)
+    openJournalSegment(`Task: ${focusStartRequest.topic}`);
+  }, [focusStartRequest, openJournalSegment, closeJournalSegment, durationForMode]);
+
   const finishSession = useCallback(() => {
     if (completionLockRef.current) return;
     completionLockRef.current = true;
@@ -167,14 +212,7 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
     setTimeLeft(0);
 
     // Update the active activity log endTime to now
-    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-      try {
-        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-      } catch (e) {
-        // non-fatal
-      }
-      sessionLogIdRef.current = null;
-    }
+    closeJournalSegment();
 
     // Audio chime
     playSound(settings.sound, settings.volume);
@@ -202,6 +240,7 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
       }, 900);
     }
   }, [
+    closeJournalSegment,
     completedInCycle,
     mode,
     onLogCompletedSession,
@@ -232,6 +271,7 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
 
   const toggleTimer = useCallback(() => {
     if (timeLeft <= 0) {
+      // Restarting after completion — setTimerMode journals a new focus segment when in focus mode
       setTimerMode(mode, true);
       return;
     }
@@ -240,47 +280,28 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
       setIsRunning(false);
 
       // close the active journal segment when pausing
-      if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-        try {
-          onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-        } catch (e) {
-          // ignore
-        }
-        sessionLogIdRef.current = null;
-      }
+      closeJournalSegment();
     } else {
       completionLockRef.current = false;
       endTimeRef.current = Date.now() + timeLeft;
       setIsRunning(true);
 
-      // start a journal entry for this focus segment
-      if (typeof onStartSessionLog === 'function') {
-        Promise.resolve()
-          .then(() => onStartSessionLog(Date.now(), intention || 'Focus Session'))
-          .then((id) => {
-            if (typeof id === 'string') sessionLogIdRef.current = id;
-          })
-          .catch(() => {});
-      }
+      // start a journal entry for this focus segment (only real focus blocks, not breaks)
+      if (mode === 'focus') openJournalSegment();
     }
-  }, [isRunning, mode, setTimerMode, timeLeft]);
+  }, [closeJournalSegment, isRunning, mode, openJournalSegment, setTimerMode, timeLeft]);
 
   const resetTimer = useCallback(() => {
     setIsRunning(false);
     completionLockRef.current = false;
 
     // If there is an active journal segment, close it on reset
-    if (sessionLogIdRef.current && typeof onUpdateSessionLog === 'function') {
-      try {
-        onUpdateSessionLog(sessionLogIdRef.current, Date.now());
-      } catch (e) {}
-      sessionLogIdRef.current = null;
-    }
+    closeJournalSegment();
 
     const duration = durationForMode(mode);
     setSessionDuration(duration);
     setTimeLeft(duration);
-  }, [durationForMode, mode]);
+  }, [closeJournalSegment, durationForMode, mode]);
 
   const handleLogDistractionSubmit = useCallback(
     (customText?: string) => {
@@ -703,12 +724,25 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
                         {task.title}
                       </span>
                     </div>
-                    <button
-                      onClick={() => onRemoveTask(task.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-400"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center shrink-0">
+                      {!task.complete && onStartFocusForTask && (
+                        <button
+                          onClick={() => onStartFocusForTask(task.title)}
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-zinc-600 hover:text-emerald-400 transition"
+                          title="Start focus timer with this topic"
+                          aria-label={`Start focus timer with topic: ${task.title}`}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onRemoveTask(task.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-400"
+                        aria-label={`Delete task: ${task.title}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

@@ -29,19 +29,6 @@ export interface TaskItem {
   createdAt: number;
 }
 
-export interface TimetableBlock {
-  id: string;
-  userId: string;
-  title: string;
-  subject: string;
-  dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
-  startTime: string; // HH:mm format
-  endTime: string;   // HH:mm format
-  location?: string;
-  color: string;
-  createdAt: number;
-}
-
 export interface DistractionItem {
   id: string;
   userId: string;
@@ -80,7 +67,7 @@ export interface ActivityLog {
   category: string;
   startTime: number;
   endTime: number;
-  rating: number; // 1 to 5
+  rating?: number; // Deprecated legacy field (rating system removed from UI)
   notes?: string;
   createdAt: number;
 }

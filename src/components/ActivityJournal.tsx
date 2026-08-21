@@ -5,14 +5,11 @@ import {
   Plus,
   Trash2,
   Download,
-  Star,
   ChevronLeft,
   ChevronRight,
   X,
-  Clock,
-  Calendar as CalendarIcon,
   AlertCircle,
-  Sparkles
+  CalendarDays
 } from 'lucide-react';
 import { TimePickerInput } from './TimePickerInput';
 
@@ -52,7 +49,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
   const [category, setCategory] = useState('Work');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
-  const [rating, setRating] = useState(3);
   const [notes, setNotes] = useState('');
 
   // View existing log modal
@@ -119,7 +115,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
     setEndTime(`${endH}:${endM}`);
     setTitle('');
     setCategory('Work');
-    setRating(3);
     setNotes('');
     setIsModalOpen(true);
   };
@@ -156,7 +151,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
       category,
       startTime: startObj.getTime(),
       endTime: endObj.getTime(),
-      rating,
       notes
     });
 
@@ -171,19 +165,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
-  };
-
-  const renderStars = (val: number) => {
-    return (
-      <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((s) => (
-          <Star
-            key={s}
-            className={`h-3.5 w-3.5 ${s <= val ? 'fill-amber-400 text-amber-400' : 'text-zinc-600'}`}
-          />
-        ))}
-      </div>
-    );
   };
 
   // Helper to check if date is today
@@ -204,9 +185,8 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
     return logs.filter((log) => log.startTime >= startOfDay && log.startTime <= endOfDay);
   };
 
-  // Calculate analytics
-  const totalLoggedMinutes = logs.reduce((acc, l) => acc + (l.endTime - l.startTime) / 60000, 0);
-  const avgRating = logs.length > 0 ? (logs.reduce((acc, l) => acc + l.rating, 0) / logs.length).toFixed(1) : '0.0';
+  // Compact stat chip: number of days with at least one logged activity
+  const activeDaysCount = new Set(logs.map((l) => new Date(l.startTime).toDateString())).size;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -249,6 +229,13 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
           </div>
 
           {/* Quick Action Buttons */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 sm:py-2 text-xs text-zinc-400" title="Days with at least one logged activity">
+            <CalendarDays className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+            <span className="whitespace-nowrap">
+              Active Days: <strong className="text-zinc-200">{activeDaysCount}</strong>
+            </span>
+          </div>
+
           <button
             onClick={() => handleOpenModal(new Date(), new Date().getHours(), Math.floor(new Date().getMinutes() / 30) * 30)}
             className="flex items-center gap-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 sm:py-2 text-xs font-medium hover:bg-emerald-500/20 transition"
@@ -264,53 +251,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
             <Download className="h-4 w-4" />
             Export
           </button>
-        </div>
-      </div>
-
-      {/* Analytics Summary Pills */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
-          <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-950/50 text-emerald-400 border border-emerald-900/50 shrink-0">
-            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Total Hours</span>
-            <span className="text-base sm:text-lg font-semibold text-zinc-100">
-              {Math.floor(totalLoggedMinutes / 60)}h {Math.round(totalLoggedMinutes % 60)}m
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
-          <div className="p-2 sm:p-2.5 rounded-xl bg-amber-950/50 text-amber-400 border border-amber-900/50 shrink-0">
-            <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-amber-400/20" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Avg Rating</span>
-            <span className="text-base sm:text-lg font-semibold text-zinc-100">{avgRating} / 5.0</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
-          <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-950/50 text-indigo-400 border border-indigo-900/50 shrink-0">
-            <Activity className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Logged Entries</span>
-            <span className="text-base sm:text-lg font-semibold text-zinc-100">{logs.length}</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3">
-          <div className="p-2 sm:p-2.5 rounded-xl bg-purple-950/50 text-purple-400 border border-purple-900/50 shrink-0">
-            <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs text-zinc-400 block truncate">Active Days</span>
-            <span className="text-base sm:text-lg font-semibold text-zinc-100">
-              {new Set(logs.map(l => new Date(l.startTime).toDateString())).size} days
-            </span>
-          </div>
         </div>
       </div>
 
@@ -351,14 +291,10 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
                       {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </div>
 
-                    {/* Gap Indicator or Entry Count */}
-                    {hasGap ? (
+                    {/* Gap Indicator */}
+                    {hasGap && (
                       <span className="inline-flex items-center gap-1 text-[10px] text-amber-400/90 bg-amber-950/40 border border-amber-900/50 px-1.5 py-0.5 rounded-full mt-1">
                         <AlertCircle className="h-2.5 w-2.5" /> Gap (No logs)
-                      </span>
-                    ) : (
-                      <span className="inline-block text-[10px] text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded-full mt-1">
-                        {dayLogs.length} {dayLogs.length === 1 ? 'entry' : 'entries'}
                       </span>
                     )}
                   </div>
@@ -475,9 +411,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
                                 {startObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
                                 {endObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
-                              <span className="flex items-center gap-0.5 text-amber-400">
-                                ★ {log.rating}
-                              </span>
                             </div>
                           </div>
                         );
@@ -567,22 +500,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
               </div>
 
               <div>
-                <label className="text-xs text-zinc-400 mb-1 flex justify-between">
-                  <span>Energy & Satisfaction Rating</span>
-                  <span className="text-emerald-400 font-semibold">{rating} / 5</span>
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  step="1"
-                  value={rating}
-                  onChange={(e) => setRating(Number(e.target.value))}
-                  className="w-full accent-emerald-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Notes (Optional)</label>
                 <textarea
                   placeholder="How did you feel? Any notable metrics or thoughts..."
@@ -643,11 +560,6 @@ export const ActivityJournal: React.FC<ActivityJournalProps> = ({ logs, onAddLog
               <div className="flex items-center justify-between py-1 border-b border-zinc-800/50">
                 <span className="text-zinc-500">Duration:</span>
                 <span>{Math.round((selectedLog.endTime - selectedLog.startTime) / 60000)} minutes</span>
-              </div>
-
-              <div className="flex items-center justify-between py-1 border-b border-zinc-800/50">
-                <span className="text-zinc-500">Energy / Rating:</span>
-                {renderStars(selectedLog.rating)}
               </div>
 
               {selectedLog.notes && (

@@ -1,7 +1,7 @@
 # AI Agent Instructions for Focus Study Clock
 
 ## Project Overview
-This is a study productivity application featuring timetable sessions, a task queue, real-time Firestore synchronization, push notifications, Google Calendar integration, and offline support. It is built as a React SPA using Vite, TypeScript, and Tailwind CSS.
+This is a study productivity application featuring a focus timer, a daily task queue with CSV/Excel import, an activity journal, real-time Firestore synchronization, push notifications, and offline support. It is built as a React SPA using Vite, TypeScript, and Tailwind CSS.
 
 ## General Coding Rules
 1. **Component Structure**: Keep components modular and single-responsibility. Extract new complex views into `src/components/`.

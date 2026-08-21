@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Target, Calendar, CheckSquare, Settings, Wifi, WifiOff, User as UserIcon, CalendarDays, Activity } from 'lucide-react';
+import { Clock, Target, CheckSquare, Settings, Wifi, WifiOff, User as UserIcon, Activity } from 'lucide-react';
 import { UserAuth } from '../types';
 
 interface NavbarProps {
@@ -20,7 +20,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   const tabs = [
     { id: 'clock', label: 'Clock & Exams', icon: Clock },
     { id: 'focus', label: 'Focus Space', icon: Target },
-    { id: 'timetable', label: 'Timetable & GCal', icon: Calendar },
     { id: 'tasks', label: 'Daily Tasks', icon: CheckSquare },
     { id: 'journal', label: 'Journal', icon: Activity },
     { id: 'settings', label: 'Settings & Stats', icon: Settings }

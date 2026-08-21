@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, CalendarPlus, BookOpen, Clock as ClockIcon, Target } from 'lucide-react';
+import { Calendar, BookOpen, Target } from 'lucide-react';
 import { ExamState } from '../types';
-import { createGCalLinkForExam } from '../lib/gcal';
 
 interface ClockViewProps {
   exam: ExamState;
@@ -33,8 +32,6 @@ export const ClockView: React.FC<ClockViewProps> = ({
     return Math.ceil((target.getTime() - today.getTime()) / DAY_MS);
   }, [exam.date, time]);
 
-  const gcalExamUrl = useMemo(() => createGCalLinkForExam(exam), [exam]);
-
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center animate-in fade-in zoom-in-95 duration-500">
       {/* Big Digital Clock */}
@@ -56,18 +53,6 @@ export const ClockView: React.FC<ClockViewProps> = ({
                 <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-400" />
                 <h2 className="text-sm sm:text-base font-medium text-zinc-200">Exam Target & Countdown</h2>
               </div>
-              {exam.date && (
-                <a
-                  href={gcalExamUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition"
-                  title="Add to Google Calendar"
-                >
-                  <CalendarPlus className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Google Calendar</span>
-                </a>
-              )}
             </div>
 
             <div className="grid gap-2.5 sm:grid-cols-[1fr_170px]">

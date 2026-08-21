@@ -9,7 +9,6 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Navbar } from './components/Navbar';
 import { ClockView } from './components/ClockView';
 import { FocusWorkspace } from './components/FocusWorkspace';
-import { TimetableCalendar } from './components/TimetableCalendar';
 import { TaskQueue } from './components/TaskQueue';
 import { SettingsStats } from './components/SettingsStats';
 import { AuthModal } from './components/AuthModal';
@@ -18,7 +17,6 @@ import {
   UserSettings,
   ExamState,
   TaskItem,
-  TimetableBlock,
   DistractionItem,
   StudySession,
   DailyTarget,
@@ -43,7 +41,6 @@ import {
   onAuthStateChanged,
   signInAnonymouslyUser
 } from './lib/firebase';
-import { checkUpcomingStudyBlocks } from './lib/notifications';
 
 const DEFAULT_SETTINGS: UserSettings = {
   focusMinutes: 25,
@@ -84,7 +81,6 @@ export default function App() {
   const [exam, setExam] = useState<ExamState>({ name: '', date: '' });
   const [intention, setIntention] = useState<string>('');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [timetables, setTimetables] = useState<TimetableBlock[]>([]);
   const [distractions, setDistractions] = useState<DistractionItem[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<string>('');
@@ -97,6 +93,8 @@ export default function App() {
 
   const [syncCode, setSyncCode] = useState<string | null>(() => localStorage.getItem('focus_sync_code'));
   const [isTabVisible, setIsTabVisible] = useState<boolean>(() => (typeof document !== 'undefined' ? !document.hidden : true));
+  // Request payload that tells FocusWorkspace to auto-start a focus session on a given topic
+  const [focusStartRequest, setFocusStartRequest] = useState<{ topic: string; ts: number } | null>(null);
 
   // Debounce timeout refs to reduce write frequency for text inputs
   const notesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,7 +159,6 @@ export default function App() {
         if (data.exam) setExam(data.exam);
         if (data.intention !== undefined) setIntention(data.intention);
         if (data.tasks) setTasks(data.tasks);
-        if (data.timetables) setTimetables(data.timetables);
         if (data.distractions) setDistractions(data.distractions);
         if (data.activityLogs) setActivityLogs(data.activityLogs);
         if (data.notes) setNotes(data.notes);
@@ -263,27 +260,6 @@ export default function App() {
     return () => unsubscribe();
   }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Sync Timetables from Firestore (Visibility-Aware)
-  useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
-    const timetablesRef = collection(db, 'timetables');
-    const q = query(timetablesRef, where('userId', '==', userAuth.uid));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const loadedBlocks: TimetableBlock[] = [];
-        snapshot.forEach((docSnap) => {
-          loadedBlocks.push({ id: docSnap.id, ...docSnap.data() } as TimetableBlock);
-        });
-        setTimetables(loadedBlocks);
-      },
-      (err) => handleFirestoreError(err, 'read', 'timetables')
-    );
-
-    return () => unsubscribe();
-  }, [userAuth?.uid, syncCode, isTabVisible]);
-
   // Sync Activity Logs from Firestore (Visibility-Aware)
   useEffect(() => {
     if (!isTabVisible || syncCode || !userAuth?.uid) return;
@@ -324,19 +300,6 @@ export default function App() {
     return () => unsubscribe();
   }, [userAuth?.uid, syncCode, isTabVisible]);
 
-  // Periodic Study Block Notification Inspector (runs every 30 seconds)
-  useEffect(() => {
-    if (!settings.enableNotifications || !timetables.length) return;
-    const interval = setInterval(() => {
-      checkUpcomingStudyBlocks(timetables, settings.notificationLeadMinutes || 5);
-    }, 30000);
-
-    // Initial check
-    checkUpcomingStudyBlocks(timetables, settings.notificationLeadMinutes || 5);
-
-    return () => clearInterval(interval);
-  }, [timetables, settings.enableNotifications, settings.notificationLeadMinutes]);
-
   const updateSyncDoc = async (code: string, updates: any) => {
     try {
       await setDoc(doc(db, 'sync_sessions', code), { ...updates, updatedAt: Date.now() }, { merge: true });
@@ -361,7 +324,6 @@ export default function App() {
         exam,
         intention,
         tasks,
-        timetables,
         distractions,
         notes,
         dailyTarget,
@@ -618,53 +580,94 @@ export default function App() {
     [syncCode]
   );
 
-  const handleAddTimetableBlock = useCallback(
-    async (blockData: Omit<TimetableBlock, 'id' | 'userId' | 'createdAt'>) => {
-      const newBlock = {
-        ...blockData,
-        id: Math.random().toString(36).substring(2, 10),
-        userId: userAuth?.uid || 'anonymous',
-        createdAt: Date.now()
-      };
+  // Bulk add tasks (used by the CSV / Excel import in the Task Queue)
+  const handleImportTasks = useCallback(
+    async (importedTasks: Array<Omit<TaskItem, 'id' | 'userId' | 'createdAt'>>) => {
+      if (!importedTasks.length) return 0;
 
       if (syncCode) {
-        setTimetables((prev) => {
-          const next = [...prev, newBlock];
-          updateSyncDoc(syncCode, { timetables: next });
+        setTasks((prev) => {
+          const created = importedTasks.map((t, i) => ({
+            ...t,
+            id: Math.random().toString(36).substring(2, 10) + Date.now().toString(36) + i,
+            userId: userAuth?.uid || 'anonymous',
+            createdAt: Date.now() + i
+          }));
+          const next = [...created, ...prev];
+          updateSyncDoc(syncCode, { tasks: next });
           return next;
         });
-        return;
+        return importedTasks.length;
       }
 
-      if (!userAuth?.uid) return;
+      if (!userAuth?.uid) return 0;
       try {
-        await addDoc(collection(db, 'timetables'), newBlock);
+        // Firestore batches are capped at 500 writes — chunk to stay under the limit
+        const chunks: Array<Array<Omit<TaskItem, 'id' | 'userId' | 'createdAt'>>> = [];
+        for (let i = 0; i < importedTasks.length; i += 400) {
+          chunks.push(importedTasks.slice(i, i + 400));
+        }
+        for (const chunk of chunks) {
+          const batch = writeBatch(db);
+          chunk.forEach((t) => {
+            const ref = doc(collection(db, 'tasks'));
+            batch.set(ref, { ...t, id: ref.id, userId: userAuth.uid, createdAt: Date.now() });
+          });
+          await batch.commit();
+        }
+        return importedTasks.length;
       } catch (err) {
-        console.warn('Error adding timetable block:', err);
+        console.warn('Error importing tasks:', err);
+        return 0;
       }
     },
     [userAuth?.uid, syncCode]
   );
 
-  const handleRemoveTimetableBlock = useCallback(
-    async (id: string) => {
-      if (syncCode) {
-        setTimetables((prev) => {
-          const next = prev.filter((b) => b.id !== id);
-          updateSyncDoc(syncCode, { timetables: next });
-          return next;
-        });
-        return;
-      }
+  // Reset Daily Study Targets & Live Stats back to their defaults
+  const handleResetDailyProgress = useCallback(async () => {
+    const todayKey = getTodayKey();
 
-      try {
-        await deleteDoc(doc(db, 'timetables', id));
-      } catch (err) {
-        console.warn('Error deleting timetable block:', err);
-      }
-    },
-    [syncCode]
-  );
+    dailySessionsRef.current = [];
+    setTodayStats({ focusMinutes: 0, sessions: 0, distractions: 0 });
+    setDistractions([]);
+    setDailyTarget(DEFAULT_DAILY_TARGET);
+
+    if (syncCode) {
+      updateSyncDoc(syncCode, {
+        todayStats: { focusMinutes: 0, sessions: 0, distractions: 0 },
+        dailyTarget: DEFAULT_DAILY_TARGET,
+        distractions: []
+      });
+      return;
+    }
+
+    if (!userAuth?.uid) return;
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', userAuth.uid), { dailyTarget: DEFAULT_DAILY_TARGET }, { merge: true });
+      batch.set(
+        doc(db, 'users', userAuth.uid, 'daily', todayKey),
+        {
+          dateKey: todayKey,
+          userId: userAuth.uid,
+          updatedAt: Date.now(),
+          stats: { focusMinutes: 0, sessions: 0, distractions: 0 },
+          sessions: [],
+          distractions: []
+        },
+        { merge: true }
+      );
+      batch.set(
+        doc(db, 'users', userAuth.uid, 'stats', 'summary'),
+        { userId: userAuth.uid, updatedAt: Date.now(), totalFocusMinutes: 0, totalSessions: 0 },
+        { merge: true }
+      );
+      await batch.commit();
+    } catch (err) {
+      handleFirestoreError(err, 'write', `users/${userAuth.uid}/daily/${todayKey}`);
+    }
+  }, [userAuth?.uid, syncCode]);
 
   const handleLogDistraction = useCallback(
     async (text: string, sessionGoal: string, durationSeconds?: number) => {
@@ -681,22 +684,22 @@ export default function App() {
       setDistractions((prev) => [newDistraction, ...prev]);
       setTodayStats((prev) => ({ ...prev, distractions: prev.distractions + 1 }));
 
-      // Also record distraction as a short activity in the Activity Journal when a duration is provided
-      if (durationSeconds !== undefined && durationSeconds > 0) {
-        try {
-          const now = Date.now();
-          await handleAddActivityLog({
-            title: `Distraction: ${text}`,
-            category: 'Other',
-            startTime: now - durationSeconds * 1000,
-            endTime: now,
-            rating: 1,
-            notes: `From session: ${sessionGoal}`
-          });
-        } catch (err) {
-          // Non-fatal — activity log best-effort
-          console.warn('Failed to add distraction activity log:', err);
-        }
+      // Always record the distraction as an activity in the Journal.
+      // Strict-mode distractions carry their real measured duration; quick/manual
+      // distractions are logged as a 1-minute slot ending at the moment of logging.
+      try {
+        const now = Date.now();
+        const loggedSeconds = durationSeconds !== undefined && durationSeconds > 0 ? durationSeconds : 60;
+        await handleAddActivityLog({
+          title: `Distraction: ${text}`,
+          category: 'Other',
+          startTime: now - loggedSeconds * 1000,
+          endTime: now,
+          notes: `From session: ${sessionGoal}`
+        });
+      } catch (err) {
+        // Non-fatal — activity log best-effort
+        console.warn('Failed to add distraction activity log:', err);
       }
 
       if (syncCode) {
@@ -855,6 +858,8 @@ export default function App() {
   const handleStartFocusForTask = useCallback((taskTitle: string) => {
     setIntention(`Task: ${taskTitle}`);
     setActiveTab('focus');
+    // Ask FocusWorkspace to switch to focus mode and start the timer immediately
+    setFocusStartRequest({ topic: taskTitle, ts: Date.now() });
   }, []);
 
   return (
@@ -895,6 +900,8 @@ export default function App() {
             }
             onToggleTask={handleToggleTask}
             onRemoveTask={handleRemoveTask}
+            onStartFocusForTask={handleStartFocusForTask}
+            focusStartRequest={focusStartRequest}
             notes={notes}
             onUpdateNotes={handleUpdateNotes}
             distractionLog={distractions}
@@ -906,8 +913,7 @@ export default function App() {
                 title: title || intention || 'Focus Session',
                 category: 'Work',
                 startTime: startTime,
-                endTime: startTime,
-                rating: 5
+                endTime: startTime
               });
               return id;
             }}
@@ -917,21 +923,13 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'timetable' && (
-          <TimetableCalendar
-            blocks={timetables}
-            onAddBlock={handleAddTimetableBlock}
-            onRemoveBlock={handleRemoveTimetableBlock}
-            notificationLeadMinutes={settings.notificationLeadMinutes}
-          />
-        )}
-
         {activeTab === 'tasks' && (
           <TaskQueue
             tasks={tasks}
             onAddTask={handleAddTask}
             onToggleTask={handleToggleTask}
             onRemoveTask={handleRemoveTask}
+            onImportTasks={handleImportTasks}
             onStartFocusForTask={handleStartFocusForTask}
           />
         )}
@@ -950,6 +948,7 @@ export default function App() {
             onUpdateSettings={handleUpdateSettings}
             dailyTarget={dailyTarget}
             onUpdateDailyTarget={handleUpdateDailyTarget}
+            onResetDailyProgress={handleResetDailyProgress}
             todayStats={todayStats}
             userAuth={userAuth}
             onOpenAuth={() => setIsAuthModalOpen(true)}

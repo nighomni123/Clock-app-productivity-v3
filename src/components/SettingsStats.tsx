@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key } from 'lucide-react';
+import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key, RotateCcw } from 'lucide-react';
 import { UserSettings, DailyTarget, DailyStats, UserAuth } from '../types';
 import { SOUND_NAMES, playSound } from '../lib/audio';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
@@ -9,6 +9,7 @@ interface SettingsStatsProps {
   onUpdateSettings: (settings: UserSettings) => void;
   dailyTarget: DailyTarget;
   onUpdateDailyTarget: (target: DailyTarget) => void;
+  onResetDailyProgress: () => void;
   todayStats: DailyStats;
   userAuth: UserAuth | null;
   onOpenAuth: () => void;
@@ -24,6 +25,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
   onUpdateSettings,
   dailyTarget,
   onUpdateDailyTarget,
+  onResetDailyProgress,
   todayStats,
   userAuth,
   onOpenAuth,
@@ -69,6 +71,16 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
       }
     } else {
       onUpdateSettings({ ...settings, enableNotifications: false });
+    }
+  };
+
+  const handleResetDailyProgressClick = () => {
+    if (
+      window.confirm(
+        "Reset Daily Study Targets & Live Stats?\n\nToday's focus minutes, sessions and distractions will be reset to zero, distraction logs for today will be cleared, and targets will be restored to their defaults (120m, 4 sessions, max 5 distractions). This cannot be undone."
+      )
+    ) {
+      onResetDailyProgress();
     }
   };
 
@@ -199,12 +211,23 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
 
       {/* Daily Targets & Real-time Progress */}
       <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-4 sm:p-6 backdrop-blur-sm">
-        <div className="mb-4 sm:mb-6 flex items-center justify-between">
+        <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-400" />
             <h2 className="font-semibold text-sm sm:text-base text-zinc-200">Daily Study Targets & Live Stats</h2>
           </div>
-          <span className="text-[10px] sm:text-xs text-zinc-500 hidden sm:inline">Auto-calculated from logged sessions</span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-[10px] sm:text-xs text-zinc-500 hidden sm:inline">Auto-calculated from logged sessions</span>
+            <button
+              type="button"
+              onClick={handleResetDailyProgressClick}
+              className="flex items-center gap-1.5 rounded-lg border border-rose-900/50 bg-rose-950/30 px-3 py-1.5 text-[11px] sm:text-xs font-medium text-rose-300 hover:bg-rose-950/60 hover:border-rose-800 transition"
+              title="Reset today's stats to zero and restore default targets"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset Targets &amp; Stats
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 text-xs">
@@ -460,7 +483,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
         <p>
           {isOnline
             ? 'Connected to Google Cloud Run and Firestore. Offline cached reads and writes enabled.'
-            : 'Working offline without an active internet connection. All session data, tasks, and timetables are saved locally in IndexedDB and will automatically sync when back online.'}
+            : 'Working offline without an active internet connection. All session data and tasks are saved locally in IndexedDB and will automatically sync when back online.'}
         </p>
       </section>
     </div>
