@@ -70,6 +70,49 @@ const getTodayKey = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+// ---------------------------------------------------------------------------
+// Local (offline / guest) persistence
+// ---------------------------------------------------------------------------
+// When Firebase Anonymous Auth is disabled or unreachable, the app falls back to
+// a local-only "guest" session (uid prefixed with "guest_"). Firestore rules
+// reject every read/write in that mode, so all data is mirrored to localStorage
+// instead — keeping tasks, journal, stats, and settings persistent across
+// refreshes and tab switches until a real account/sync code is used.
+const LOCAL_KEYS = {
+  tasks: 'focus_local_tasks',
+  activityLogs: 'focus_local_activity_logs',
+  distractions: 'focus_local_distractions',
+  daily: 'focus_local_daily',
+  settings: 'focus_local_settings',
+  dailyTarget: 'focus_local_daily_target',
+  exam: 'focus_local_exam',
+  intention: 'focus_local_intention',
+  notes: 'focus_local_notes'
+} as const;
+
+function loadLocal<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveLocal(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage full / unavailable — non-fatal
+  }
+}
+
+/** Remove undefined fields so Firestore writes never throw on them. */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('focus');
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
@@ -169,9 +212,63 @@ export default function App() {
     return () => unsub();
   }, [syncCode]);
 
+  // Local-only guest mode: anonymous auth unavailable → Firestore rules reject all
+  // traffic, so persist everything to localStorage instead of Firestore.
+  const isLocalOnlyMode = !!userAuth && !syncCode && userAuth.uid.startsWith('guest_');
+
+  // Hydrate state from localStorage when entering local-only mode
+  useEffect(() => {
+    if (!isLocalOnlyMode || !userAuth) return;
+    setTasks(loadLocal<TaskItem[]>(LOCAL_KEYS.tasks, []));
+    setActivityLogs(loadLocal<ActivityLog[]>(LOCAL_KEYS.activityLogs, []));
+    setDistractions(loadLocal<DistractionItem[]>(LOCAL_KEYS.distractions, []));
+    setNotes(loadLocal<string>(LOCAL_KEYS.notes, ''));
+    setIntention(loadLocal<string>(LOCAL_KEYS.intention, ''));
+    setExam(loadLocal<ExamState>(LOCAL_KEYS.exam, { name: '', date: '' }));
+    setSettings({ ...DEFAULT_SETTINGS, ...loadLocal<Partial<UserSettings>>(LOCAL_KEYS.settings, {}) });
+    setDailyTarget({ ...DEFAULT_DAILY_TARGET, ...loadLocal<Partial<DailyTarget>>(LOCAL_KEYS.dailyTarget, {}) });
+    // Daily stats only survive for the same calendar day
+    const daily = loadLocal<{ dateKey: string; stats: DailyStats } | null>(LOCAL_KEYS.daily, null);
+    if (daily && daily.dateKey === getTodayKey() && daily.stats) {
+      setTodayStats(daily.stats);
+    } else {
+      setTodayStats({ focusMinutes: 0, sessions: 0, distractions: 0 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLocalOnlyMode]);
+
+  // Mirror state into localStorage while in local-only mode
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.tasks, tasks);
+  }, [tasks, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.activityLogs, activityLogs);
+  }, [activityLogs, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.distractions, distractions);
+  }, [distractions, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.daily, { dateKey: getTodayKey(), stats: todayStats });
+  }, [todayStats, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.settings, settings);
+  }, [settings, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.dailyTarget, dailyTarget);
+  }, [dailyTarget, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.exam, exam);
+  }, [exam, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.intention, intention);
+  }, [intention, isLocalOnlyMode]);
+  useEffect(() => {
+    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.notes, notes);
+  }, [notes, isLocalOnlyMode]);
+
   // Sync User Document & Settings from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || isLocalOnlyMode || !userAuth?.uid) return;
     const userDocRef = doc(db, 'users', userAuth.uid);
 
     const unsubscribe = onSnapshot(
@@ -208,7 +305,7 @@ export default function App() {
 
   // Sync Daily Aggregated Record (Sessions, Distractions, Today Stats in 1 Document)
   useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || isLocalOnlyMode || !userAuth?.uid) return;
     const todayKey = getTodayKey();
     const dailyDocRef = doc(db, 'users', userAuth.uid, 'daily', todayKey);
 
@@ -240,7 +337,7 @@ export default function App() {
 
   // Sync Tasks from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || isLocalOnlyMode || !userAuth?.uid) return;
     const tasksRef = collection(db, 'tasks');
     const q = query(tasksRef, where('userId', '==', userAuth.uid));
 
@@ -249,7 +346,7 @@ export default function App() {
       (snapshot) => {
         const loadedTasks: TaskItem[] = [];
         snapshot.forEach((docSnap) => {
-          loadedTasks.push({ id: docSnap.id, ...docSnap.data() } as TaskItem);
+          loadedTasks.push({ ...docSnap.data(), id: docSnap.id } as TaskItem);
         });
         loadedTasks.sort((a, b) => b.createdAt - a.createdAt);
         setTasks(loadedTasks);
@@ -262,7 +359,7 @@ export default function App() {
 
   // Sync Activity Logs from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || isLocalOnlyMode || !userAuth?.uid) return;
     const logsRef = collection(db, 'activity_logs');
     const q = query(logsRef, where('userId', '==', userAuth.uid));
 
@@ -271,7 +368,7 @@ export default function App() {
       (snapshot) => {
         const loaded: ActivityLog[] = [];
         snapshot.forEach((docSnap) => {
-          loaded.push({ id: docSnap.id, ...docSnap.data() } as ActivityLog);
+          loaded.push({ ...docSnap.data(), id: docSnap.id } as ActivityLog);
         });
         loaded.sort((a, b) => b.startTime - a.startTime);
         setActivityLogs(loaded);
@@ -284,7 +381,7 @@ export default function App() {
 
   // Sync Quick Notes from Firestore (Visibility-Aware)
   useEffect(() => {
-    if (!isTabVisible || syncCode || !userAuth?.uid) return;
+    if (!isTabVisible || syncCode || isLocalOnlyMode || !userAuth?.uid) return;
     const notesDocRef = doc(db, 'notes', userAuth.uid);
 
     const unsubscribe = onSnapshot(
@@ -366,6 +463,8 @@ export default function App() {
         updateSyncDoc(syncCode, { settings: newSettings });
         return;
       }
+      // Local-only mode: state already updated; localStorage mirror persists it
+      if (isLocalOnlyMode) return;
       if (!userAuth?.uid) return;
       try {
         await setDoc(doc(db, 'users', userAuth.uid), { settings: newSettings }, { merge: true });
@@ -383,6 +482,7 @@ export default function App() {
         updateSyncDoc(syncCode, { dailyTarget: newTarget });
         return;
       }
+      if (isLocalOnlyMode) return;
       if (!userAuth?.uid) return;
       try {
         await setDoc(doc(db, 'users', userAuth.uid), { dailyTarget: newTarget }, { merge: true });
@@ -400,6 +500,7 @@ export default function App() {
         updateSyncDoc(syncCode, { exam: newExam });
         return;
       }
+      if (isLocalOnlyMode) return;
       if (!userAuth?.uid) return;
       try {
         await setDoc(doc(db, 'users', userAuth.uid), { exam: newExam }, { merge: true });
@@ -425,6 +526,11 @@ export default function App() {
           updateSyncDoc(syncCode, { activityLogs: next });
           return next;
         });
+        return newLog.id;
+      }
+
+      if (isLocalOnlyMode) {
+        setActivityLogs((prev) => [newLog, ...prev]);
         return newLog.id;
       }
 
@@ -460,6 +566,8 @@ export default function App() {
         return;
       }
 
+      if (isLocalOnlyMode) return;
+
       try {
         await setDoc(doc(db, 'activity_logs', id), updates, { merge: true });
       } catch (err) {
@@ -480,6 +588,8 @@ export default function App() {
         return;
       }
 
+      if (isLocalOnlyMode) return;
+
       try {
         await deleteDoc(doc(db, 'activity_logs', id));
       } catch (err) {
@@ -496,6 +606,7 @@ export default function App() {
         updateSyncDoc(syncCode, { intention: newIntention });
         return;
       }
+      if (isLocalOnlyMode) return;
       if (!userAuth?.uid) return;
 
       if (intentionTimeoutRef.current) clearTimeout(intentionTimeoutRef.current);
@@ -512,14 +623,13 @@ export default function App() {
 
   const handleAddTask = useCallback(
     async (taskData: Omit<TaskItem, 'id' | 'userId' | 'createdAt'>) => {
-      const newTask = {
-        ...taskData,
-        id: Math.random().toString(36).substring(2, 10),
-        userId: userAuth?.uid || 'anonymous',
-        createdAt: Date.now()
-      };
-
       if (syncCode) {
+        const newTask = stripUndefined({
+          ...taskData,
+          id: Math.random().toString(36).substring(2, 10),
+          userId: userAuth?.uid || 'anonymous',
+          createdAt: Date.now()
+        }) as TaskItem;
         setTasks((prev) => {
           const next = [newTask, ...prev];
           updateSyncDoc(syncCode, { tasks: next });
@@ -528,14 +638,28 @@ export default function App() {
         return;
       }
 
+      if (isLocalOnlyMode) {
+        const newTask = stripUndefined({
+          ...taskData,
+          id: Math.random().toString(36).substring(2, 10),
+          userId: userAuth?.uid || 'anonymous',
+          createdAt: Date.now()
+        }) as TaskItem;
+        setTasks((prev) => [newTask, ...prev]);
+        return;
+      }
+
       if (!userAuth?.uid) return;
       try {
-        await addDoc(collection(db, 'tasks'), newTask);
+        // Use a deterministic doc id so data.id always matches the Firestore doc id
+        const ref = doc(collection(db, 'tasks'));
+        const persisted = stripUndefined({ ...taskData, id: ref.id, userId: userAuth.uid, createdAt: Date.now() });
+        await setDoc(ref, persisted);
       } catch (err) {
         console.warn('Error adding task:', err);
       }
     },
-    [userAuth?.uid, syncCode]
+    [userAuth?.uid, syncCode, isLocalOnlyMode]
   );
 
   const handleToggleTask = useCallback(
@@ -546,6 +670,11 @@ export default function App() {
           updateSyncDoc(syncCode, { tasks: next });
           return next;
         });
+        return;
+      }
+
+      if (isLocalOnlyMode) {
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, complete: !t.complete } : t)));
         return;
       }
 
@@ -571,6 +700,11 @@ export default function App() {
         return;
       }
 
+      if (isLocalOnlyMode) {
+        setTasks((prev) => prev.filter((t) => t.id !== id));
+        return;
+      }
+
       try {
         await deleteDoc(doc(db, 'tasks', id));
       } catch (err) {
@@ -587,12 +721,14 @@ export default function App() {
 
       if (syncCode) {
         setTasks((prev) => {
-          const created = importedTasks.map((t, i) => ({
-            ...t,
-            id: Math.random().toString(36).substring(2, 10) + Date.now().toString(36) + i,
-            userId: userAuth?.uid || 'anonymous',
-            createdAt: Date.now() + i
-          }));
+          const created = importedTasks.map((t, i) =>
+            stripUndefined({
+              ...t,
+              id: Math.random().toString(36).substring(2, 10) + Date.now().toString(36) + i,
+              userId: userAuth?.uid || 'anonymous',
+              createdAt: Date.now() + i
+            })
+          ) as TaskItem[];
           const next = [...created, ...prev];
           updateSyncDoc(syncCode, { tasks: next });
           return next;
@@ -600,9 +736,26 @@ export default function App() {
         return importedTasks.length;
       }
 
+      if (isLocalOnlyMode) {
+        setTasks((prev) => {
+          const created = importedTasks.map((t, i) =>
+            stripUndefined({
+              ...t,
+              id: Math.random().toString(36).substring(2, 10) + Date.now().toString(36) + i,
+              userId: userAuth?.uid || 'anonymous',
+              createdAt: Date.now() + i
+            })
+          ) as TaskItem[];
+          return [...created, ...prev];
+        });
+        return importedTasks.length;
+      }
+
       if (!userAuth?.uid) return 0;
       try {
-        // Firestore batches are capped at 500 writes — chunk to stay under the limit
+        // Firestore batches are capped at 500 writes — chunk to stay under the limit.
+        // stripUndefined prevents "Unsupported field value: undefined" commit failures
+        // (e.g. rows imported without a dueDate).
         const chunks: Array<Array<Omit<TaskItem, 'id' | 'userId' | 'createdAt'>>> = [];
         for (let i = 0; i < importedTasks.length; i += 400) {
           chunks.push(importedTasks.slice(i, i + 400));
@@ -611,17 +764,17 @@ export default function App() {
           const batch = writeBatch(db);
           chunk.forEach((t) => {
             const ref = doc(collection(db, 'tasks'));
-            batch.set(ref, { ...t, id: ref.id, userId: userAuth.uid, createdAt: Date.now() });
+            batch.set(ref, stripUndefined({ ...t, id: ref.id, userId: userAuth.uid, createdAt: Date.now() }));
           });
           await batch.commit();
         }
         return importedTasks.length;
       } catch (err) {
-        console.warn('Error importing tasks:', err);
+        handleFirestoreError(err, 'write', 'tasks');
         return 0;
       }
     },
-    [userAuth?.uid, syncCode]
+    [userAuth?.uid, syncCode, isLocalOnlyMode]
   );
 
   // Reset Daily Study Targets & Live Stats back to their defaults
@@ -641,6 +794,8 @@ export default function App() {
       });
       return;
     }
+
+    if (isLocalOnlyMode) return;
 
     if (!userAuth?.uid) return;
     try {
@@ -667,7 +822,7 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, 'write', `users/${userAuth.uid}/daily/${todayKey}`);
     }
-  }, [userAuth?.uid, syncCode]);
+  }, [userAuth?.uid, syncCode, isLocalOnlyMode]);
 
   const handleLogDistraction = useCallback(
     async (text: string, sessionGoal: string, durationSeconds?: number) => {
@@ -709,6 +864,8 @@ export default function App() {
         });
         return;
       }
+
+      if (isLocalOnlyMode) return;
 
       if (!userAuth?.uid) return;
       try {
@@ -794,6 +951,22 @@ export default function App() {
         return;
       }
 
+      if (isLocalOnlyMode) {
+        dailySessionsRef.current = [
+          ...dailySessionsRef.current,
+          {
+            id: Math.random().toString(36).substring(2, 10),
+            userId: userAuth?.uid || 'anonymous',
+            title: intention || 'Focus Session',
+            focusMinutes: focusMins,
+            breakMinutes: settings.breakMinutes,
+            completedAt: Date.now(),
+            dateKey: todayKey
+          }
+        ];
+        return;
+      }
+
       if (!userAuth?.uid) return;
 
       try {
@@ -852,7 +1025,7 @@ export default function App() {
         handleFirestoreError(err, 'write', `users/${userAuth.uid}/daily/${todayKey}`);
       }
     },
-    [intention, settings.breakMinutes, userAuth?.uid, syncCode, todayStats]
+    [intention, settings.breakMinutes, userAuth?.uid, syncCode, isLocalOnlyMode, todayStats]
   );
 
   const handleStartFocusForTask = useCallback((taskTitle: string) => {

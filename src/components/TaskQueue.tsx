@@ -70,12 +70,22 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
     try {
       const { drafts, skippedRows } = await parseTasksFile(file);
       const added = await onImportTasks(drafts);
-      setImportStatus({
-        type: 'success',
-        message: `Imported ${added} task${added === 1 ? '' : 's'}${
-          skippedRows > 0 ? `, skipped ${skippedRows} invalid row${skippedRows === 1 ? '' : 's'}` : ''
-        }.`
-      });
+      if (added >= drafts.length) {
+        setImportStatus({
+          type: 'success',
+          message: `Imported ${added} task${added === 1 ? '' : 's'}${
+            skippedRows > 0 ? `, skipped ${skippedRows} invalid row${skippedRows === 1 ? '' : 's'}` : ''
+          }.`
+        });
+      } else {
+        setImportStatus({
+          type: 'error',
+          message:
+            added > 0
+              ? `Only ${added} of ${drafts.length} tasks could be saved. Check your connection and sign-in status, then retry.`
+              : 'Import failed — no tasks could be saved. Check your connection and sign-in status, then retry.'
+        });
+      }
     } catch (err) {
       setImportStatus({
         type: 'error',
