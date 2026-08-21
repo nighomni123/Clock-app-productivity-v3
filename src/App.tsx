@@ -415,24 +415,21 @@ export default function App() {
     }
     const formatted = `${code.slice(0, 3)}-${code.slice(3, 6)}-${code.slice(6, 9)}`;
 
-    try {
-      await setDoc(doc(db, 'sync_sessions', formatted), {
-        settings,
-        exam,
-        intention,
-        tasks,
-        distractions,
-        notes,
-        dailyTarget,
-        todayStats,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
-      localStorage.setItem('focus_sync_code', formatted);
-      setSyncCode(formatted);
-    } catch (err) {
-      console.error('Failed to create sync session', err);
-    }
+    // No swallow: errors propagate to the Settings UI so failures are visible
+    await setDoc(doc(db, 'sync_sessions', formatted), {
+      settings,
+      exam,
+      intention,
+      tasks,
+      distractions,
+      notes,
+      dailyTarget,
+      todayStats,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    localStorage.setItem('focus_sync_code', formatted);
+    setSyncCode(formatted);
   };
 
   const handleJoinSyncCode = async (inputCode: string) => {

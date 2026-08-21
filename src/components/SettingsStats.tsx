@@ -38,6 +38,8 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
   const notifStatus = getNotificationPermissionStatus();
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [generateError, setGenerateError] = useState('');
 
   const formatSyncCodeInput = (val: string) => {
     const v = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -58,6 +60,21 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
       setJoinError('Sync code not found. Please check and try again.');
     } else {
       setJoinCodeInput('');
+    }
+  };
+
+  const handleGenerateClick = async () => {
+    setIsGeneratingCode(true);
+    setGenerateError('');
+    try {
+      await onGenerateSyncCode();
+    } catch (err) {
+      console.error('Failed to create sync session:', err);
+      setGenerateError(
+        'Could not create a sync code — the database rejected the request. Check your internet connection and Firebase configuration (if you just migrated projects, restart the dev server so the new env vars load).'
+      );
+    } finally {
+      setIsGeneratingCode(false);
     }
   };
 
@@ -171,11 +188,17 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                 </p>
               </div>
               <button
-                onClick={onGenerateSyncCode}
-                className="w-full rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-2 text-xs sm:text-sm font-medium hover:bg-emerald-500/20 transition cursor-pointer"
+                onClick={handleGenerateClick}
+                disabled={isGeneratingCode}
+                className="w-full rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-2 text-xs sm:text-sm font-medium hover:bg-emerald-500/20 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Generate Sync Code
+                {isGeneratingCode ? 'Generating…' : 'Generate Sync Code'}
               </button>
+              {generateError && (
+                <p className="text-[11px] leading-relaxed rounded-lg border border-rose-900/50 bg-rose-950/30 px-3 py-2 text-rose-300" role="alert">
+                  {generateError}
+                </p>
+              )}
             </div>
 
             {/* Join Code */}
