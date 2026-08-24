@@ -11,6 +11,23 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Split heavyweight vendors into cacheable chunks so no single file
+          // balloons (xlsx is already lazily imported by taskImport.ts).
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            'vendor-motion': ['motion/react'],
+          },
+        },
+      },
+      // Firebase's Firestore SDK alone approaches ~760 kB minified (~191 kB
+      // gzipped, cached as its own chunk); the ceiling stays meaningful for
+      // catching real regressions while tolerating known-vendor weight.
+      chunkSizeWarningLimit: 800,
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
