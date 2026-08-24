@@ -6,4 +6,4 @@
  * server (server/index.ts) imports this re-export shim, so both entrypoints
  * share identical behavior. The API key is read from process.env only.
  */
-export * from '../api/_lib/gemini';
+export * from '../api/_lib/gemini.js';

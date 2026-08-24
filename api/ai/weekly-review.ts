@@ -2,7 +2,7 @@
  * Vercel Serverless Function: POST /api/ai/weekly-review
  * Gemini-powered weekly review (3 actionable insights). Key stays server-side.
  */
-import { handleWeeklyReview, type ApiRequest, type ApiResponse } from './_shared';
+import { handleWeeklyReview, type ApiRequest, type ApiResponse } from './_shared.js';
 
 export const maxDuration = 60;
 

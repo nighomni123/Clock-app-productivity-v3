@@ -2,7 +2,7 @@
  * Vercel Serverless Function: POST /api/ai/day-plan
  * Gemini-powered prioritized daily schedule. Key read from env server-side.
  */
-import { handleDayPlan, type ApiRequest, type ApiResponse } from './_shared';
+import { handleDayPlan, type ApiRequest, type ApiResponse } from './_shared.js';
 
 export const maxDuration = 60;
 

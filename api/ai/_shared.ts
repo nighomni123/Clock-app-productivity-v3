@@ -13,7 +13,7 @@ import {
   WeeklyReviewRequestInput,
   generateDayPlan,
   generateWeeklyReview
-} from '../_lib/gemini';
+} from '../_lib/gemini.js';
 
 /** Minimal structural types compatible with Vercel's Node.js request/response. */
 export interface ApiRequest {
