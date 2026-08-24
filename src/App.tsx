@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Navbar } from './components/Navbar';
@@ -22,7 +22,8 @@ import {
   DailyTarget,
   DailyStats,
   UserAuth,
-  ActivityLog
+  ActivityLog,
+  WeeklyInsightsData
 } from './types';
 import {
   auth,
@@ -1032,6 +1033,48 @@ export default function App() {
     setFocusStartRequest({ topic: taskTitle, ts: Date.now() });
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // AI Feature inputs
+  // ---------------------------------------------------------------------------
+  // Aggregated last-7-days snapshot consumed by the AI Weekly Insight card.
+  const weeklyInsightsData = useMemo<WeeklyInsightsData>(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const weekLogs = activityLogs.filter((l) => l.endTime > weekAgo);
+
+    const totalFocusMs = weekLogs.reduce(
+      (sum, l) => sum + Math.max(0, l.endTime - l.startTime),
+      0
+    );
+    const completedTasks = tasks.filter((t) => t.complete).length;
+    const sessionCount = weekLogs.filter((l) => {
+      if (l.category !== 'Work') return false;
+      return l.endTime - l.startTime >= 5 * 60 * 1000;
+    }).length;
+
+    const journalEntries = [...weekLogs]
+      .sort((a, b) => b.startTime - a.startTime)
+      .slice(0, 20)
+      .map((l) => ({
+        title: l.title,
+        category: l.category,
+        notes: l.notes,
+        durationMinutes:
+          l.endTime > l.startTime ? Math.round((l.endTime - l.startTime) / 60000) : undefined
+      }));
+
+    const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+    return {
+      rangeLabel: `${fmt.format(new Date(weekAgo))} – ${fmt.format(new Date())}`,
+      completedTasks,
+      openTasks: tasks.length - completedTasks,
+      totalFocusMinutes: Math.round(totalFocusMs / 60000),
+      sessionCount,
+      distractionCount: distractions.filter((d) => d.createdAt > weekAgo).length,
+      dailyTargetMinutes: dailyTarget.minutes,
+      journalEntries
+    };
+  }, [activityLogs, tasks, distractions, dailyTarget.minutes]);
+
   return (
     <div className="min-h-screen flex flex-col bg-black text-zinc-100 font-sans selection:bg-zinc-800">
       {/* Top Navbar */}
@@ -1096,6 +1139,9 @@ export default function App() {
         {activeTab === 'tasks' && (
           <TaskQueue
             tasks={tasks}
+            activityLogs={activityLogs}
+            defaultFocusMinutes={settings.focusMinutes}
+            defaultBreakMinutes={settings.breakMinutes}
             onAddTask={handleAddTask}
             onToggleTask={handleToggleTask}
             onRemoveTask={handleRemoveTask}
@@ -1120,6 +1166,7 @@ export default function App() {
             onUpdateDailyTarget={handleUpdateDailyTarget}
             onResetDailyProgress={handleResetDailyProgress}
             todayStats={todayStats}
+            weeklyInsightsData={weeklyInsightsData}
             userAuth={userAuth}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             isOnline={isOnline}

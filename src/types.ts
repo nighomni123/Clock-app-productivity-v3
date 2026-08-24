@@ -78,3 +78,59 @@ export interface UserAuth {
   displayName?: string | null;
   email?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// AI features (Gemini via the server-side /api/ai endpoints)
+// ---------------------------------------------------------------------------
+
+/** One editable focus block inside an AI-generated day plan. */
+export interface AiPlannedBlock {
+  id: string;
+  title: string;
+  priority: 'high' | 'medium' | 'low';
+  focusMinutes: number;
+  breakMinutes: number;
+  /** Suggested start offset in minutes from "now". */
+  startMinutesFromNow?: number;
+  /** Short model-generated explanation for this block. */
+  rationale?: string;
+}
+
+/** A full AI day plan returned by POST /api/ai/day-plan. */
+export interface AiDayPlan {
+  overview: string;
+  totalFocusMinutes: number;
+  blocks: AiPlannedBlock[];
+}
+
+/** Journal/activity sample sent to Gemini (stripped of ids/user fields). */
+export interface WeeklyJournalSample {
+  title: string;
+  category?: string;
+  notes?: string;
+  durationMinutes?: number;
+}
+
+/** Aggregate stats describing the last 7 days, computed client-side in App. */
+export interface WeeklyInsightsData {
+  rangeLabel: string;
+  completedTasks: number;
+  openTasks: number;
+  totalFocusMinutes: number;
+  sessionCount: number;
+  distractionCount: number;
+  dailyTargetMinutes: number;
+  journalEntries: WeeklyJournalSample[];
+}
+
+export interface WeeklyInsight {
+  title: string;
+  detail: string;
+  category: 'focus' | 'consistency' | 'wellbeing' | 'tasks';
+}
+
+/** A full AI weekly review returned by POST /api/ai/weekly-review. */
+export interface WeeklyReview {
+  summary: string;
+  insights: WeeklyInsight[];
+}

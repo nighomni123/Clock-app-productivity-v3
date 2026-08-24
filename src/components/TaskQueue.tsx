@@ -1,10 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { CheckSquare, Plus, Trash2, Check, Clock, Upload, FileSpreadsheet, X, Download, AlertCircle, Loader2, Play } from 'lucide-react';
-import { TaskItem } from '../types';
+import { CheckSquare, Plus, Trash2, Check, Clock, Upload, FileSpreadsheet, X, Download, AlertCircle, Loader2, Play, Sparkles } from 'lucide-react';
+import { TaskItem, ActivityLog, AiDayPlan } from '../types';
 import { IMPORT_ACCEPT, IMPORT_COLUMNS, SAMPLE_CSV, parseTasksFile } from '../lib/taskImport';
+import { requestDayPlan } from '../lib/aiClient';
+import { AiDayPlannerModal } from './AiDayPlannerModal';
 
 interface TaskQueueProps {
   tasks: TaskItem[];
+  activityLogs: ActivityLog[];
+  defaultFocusMinutes: number;
+  defaultBreakMinutes: number;
   onAddTask: (task: Omit<TaskItem, 'id' | 'userId' | 'createdAt'>) => void;
   onToggleTask: (id: string) => void;
   onRemoveTask: (id: string) => void;
@@ -14,6 +19,9 @@ interface TaskQueueProps {
 
 export const TaskQueue: React.FC<TaskQueueProps> = ({
   tasks,
+  activityLogs,
+  defaultFocusMinutes,
+  defaultBreakMinutes,
   onAddTask,
   onToggleTask,
   onRemoveTask,
@@ -34,6 +42,13 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
     message: ''
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Day Planner (Feature 1) state
+  const [isPlanOpen, setIsPlanOpen] = useState(false);
+  const [isPlanGenerating, setIsPlanGenerating] = useState(false);
+  const [isAcceptingPlan, setIsAcceptingPlan] = useState(false);
+  const [planError, setPlanError] = useState('');
+  const [dayPlan, setDayPlan] = useState<AiDayPlan | null>(null);
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +124,61 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  // --- AI Day Planner (Feature 1) -----------------------------------------
+
+  const handleGeneratePlan = async () => {
+    setIsPlanGenerating(true);
+    setPlanError('');
+    setIsPlanOpen(true);
+    try {
+      // Send today's queue + recent journal entries to the server-side Gemini
+      // endpoint; the API key never leaves the Express server.
+      const plan = await requestDayPlan(tasks, activityLogs, {
+        defaultFocusMinutes,
+        defaultBreakMinutes
+      });
+      setDayPlan({
+        ...plan,
+        blocks: plan.blocks.map((b, i) => ({ ...b, id: `plan-${Date.now()}-${i}` }))
+      });
+    } catch (err) {
+      setDayPlan(null);
+      setPlanError(err instanceof Error ? err.message : 'Failed to generate a day plan. Please try again.');
+    } finally {
+      setIsPlanGenerating(false);
+    }
+  };
+
+  const handleAcceptPlan = async (blocks: AiDayPlan['blocks']) => {
+    const drafts = blocks
+      .filter((b) => b.title.trim().length > 0)
+      .map((b) => ({
+        title: b.title.trim(),
+        complete: false as const,
+        priority: b.priority,
+        estimatedMinutes: b.focusMinutes
+      }));
+    if (!drafts.length) return;
+
+    setIsAcceptingPlan(true);
+    try {
+      const added = await onImportTasks(drafts);
+      if (added > 0) {
+        setImportStatus({
+          type: 'success',
+          message: `AI plan accepted — added ${added} task${added === 1 ? '' : 's'} to your daily queue.`
+        });
+        setIsPlanOpen(false);
+        setDayPlan(null);
+        setPlanError('');
+      } else {
+        setPlanError('Could not save the plan to your queue. Check your connection and sign-in status, then retry.');
+      }
+    } finally {
+      setIsAcceptingPlan(false);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-5xl animate-in fade-in zoom-in-95 duration-500">
       {/* Header Banner */}
@@ -123,11 +193,33 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-black/40 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs">
-          <span className="text-zinc-400">Progress:</span>
-          <span className="font-semibold text-zinc-100">
-            {completedCount} / {tasks.length} Completed
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {planError && !isPlanOpen && (
+            <p className="w-full rounded-xl border border-rose-900/50 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-300" role="alert">
+              {planError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleGeneratePlan}
+            disabled={isPlanGenerating || tasks.length === 0}
+            title="Ask Gemini to turn today's task queue and recent journal entries into a focused schedule"
+            aria-label="Generate an AI-prioritized day plan from today's tasks and recent journal entries"
+            className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-medium text-violet-300 transition hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPlanGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            <span>{isPlanGenerating ? 'Planning…' : 'Plan My Day'}</span>
+          </button>
+          <div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-black/40 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs">
+            <span className="text-zinc-400">Progress:</span>
+            <span className="font-semibold text-zinc-100">
+              {completedCount} / {tasks.length} Completed
+            </span>
+          </div>
         </div>
       </div>
 
@@ -280,6 +372,25 @@ export const TaskQueue: React.FC<TaskQueueProps> = ({
           })
         )}
       </div>
+
+      {/* AI Day Planner Modal (Feature 1) */}
+      <AiDayPlannerModal
+        isOpen={isPlanOpen}
+        isGenerating={isPlanGenerating}
+        isAccepting={isAcceptingPlan}
+        error={planError}
+        plan={dayPlan}
+        onClose={() => {
+          if (isAcceptingPlan || isPlanGenerating) return;
+          setIsPlanOpen(false);
+          setPlanError('');
+        }}
+        onRegenerate={handleGeneratePlan}
+        onChangeBlocks={(blocks) =>
+          setDayPlan((prev) => (prev ? { ...prev, blocks } : prev))
+        }
+        onAccept={handleAcceptPlan}
+      />
 
       {/* Import CSV / Excel Dialog */}
       {isImportOpen && (

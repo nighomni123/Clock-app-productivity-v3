@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key, RotateCcw } from 'lucide-react';
-import { UserSettings, DailyTarget, DailyStats, UserAuth } from '../types';
+import { UserSettings, DailyTarget, DailyStats, UserAuth, WeeklyInsightsData } from '../types';
 import { SOUND_NAMES, playSound } from '../lib/audio';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
+import { AiWeeklyInsightCard } from './AiWeeklyInsightCard';
 
 interface SettingsStatsProps {
   settings: UserSettings;
@@ -11,6 +12,7 @@ interface SettingsStatsProps {
   onUpdateDailyTarget: (target: DailyTarget) => void;
   onResetDailyProgress: () => void;
   todayStats: DailyStats;
+  weeklyInsightsData: WeeklyInsightsData;
   userAuth: UserAuth | null;
   onOpenAuth: () => void;
   isOnline: boolean;
@@ -27,6 +29,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
   onUpdateDailyTarget,
   onResetDailyProgress,
   todayStats,
+  weeklyInsightsData,
   userAuth,
   onOpenAuth,
   isOnline,
@@ -338,6 +341,9 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
           </div>
         </div>
       </section>
+
+      {/* AI Weekly Insight (Feature 2) */}
+      <AiWeeklyInsightCard data={weeklyInsightsData} />
 
       {/* Grid: Timer Durations & Audio Notifications */}
       <div className="grid gap-6 md:grid-cols-2 text-xs">
