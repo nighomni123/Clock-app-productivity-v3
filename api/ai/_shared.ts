@@ -2,8 +2,9 @@
  * Shared glue for the Vercel Serverless Functions in api/ai/*.
  *
  * These handlers wrap the exact same Gemini logic used by the self-hosted
- * Express server (server/gemini.ts), so behavior is identical whether the
- * app runs full-stack locally or as static site + functions on Vercel.
+ * Express server. The single source of truth lives in api/_lib/gemini.ts —
+ * INSIDE the api tree so Vercel's file tracing always bundles it — and
+ * server/gemini.ts re-exports it for the self-hosted Express entrypoint.
  * The GEMINI_API_KEY comes from Vercel environment variables — never bundled.
  */
 import {
@@ -12,7 +13,7 @@ import {
   WeeklyReviewRequestInput,
   generateDayPlan,
   generateWeeklyReview
-} from '../../server/gemini';
+} from '../_lib/gemini';
 
 /** Minimal structural types compatible with Vercel's Node.js request/response. */
 export interface ApiRequest {

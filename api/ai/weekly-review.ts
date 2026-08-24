@@ -7,5 +7,11 @@ import { handleWeeklyReview, type ApiRequest, type ApiResponse } from './_shared
 export const maxDuration = 60;
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
-  await handleWeeklyReview(req, res);
+  try {
+    await handleWeeklyReview(req, res);
+  } catch (err) {
+    // Safety net: never let the client receive a bodyless platform 500.
+    console.error('[weekly-review] unhandled error:', err);
+    res.status(500).json({ error: 'Unexpected server error.' });
+  }
 }
