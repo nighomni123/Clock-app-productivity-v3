@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, BookOpen, Target } from 'lucide-react';
-import { ExamState } from '../types';
+import { ExamState, UserSettings } from '../types';
+import RollingClock from './RollingClock';
+import { RollingNumber } from '@kitlangton/rolling-number/react';
 
 interface ClockViewProps {
   exam: ExamState;
   onUpdateExam: (exam: ExamState) => void;
   intention: string;
   onUpdateIntention: (intention: string) => void;
+  clockAnimation: UserSettings['clockAnimation'];
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -15,7 +18,8 @@ export const ClockView: React.FC<ClockViewProps> = ({
   exam,
   onUpdateExam,
   intention,
-  onUpdateIntention
+  onUpdateIntention,
+  clockAnimation
 }) => {
   const [time, setTime] = useState(new Date());
 
@@ -37,7 +41,10 @@ export const ClockView: React.FC<ClockViewProps> = ({
       {/* Big Digital Clock */}
       <div className="py-4 sm:py-8 md:py-14 text-center">
         <h1 className="text-5xl sm:text-7xl md:text-[8rem] lg:text-[10rem] font-extralight tracking-tighter text-zinc-100 tabular-nums">
-          {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+          <RollingClock
+            text={time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+            clockAnimation={clockAnimation}
+          />
         </h1>
         <p className="mt-2 sm:mt-4 text-xs sm:text-base font-light uppercase tracking-[0.25em] text-zinc-500 md:text-2xl">
           {time.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
@@ -77,7 +84,17 @@ export const ClockView: React.FC<ClockViewProps> = ({
           {daysRemaining !== null ? (
             <div className="mt-4 sm:mt-5 rounded-2xl border border-zinc-800/80 bg-black/40 p-4 sm:p-5 text-center">
               <div className={`text-3xl sm:text-5xl font-light tabular-nums ${daysRemaining < 0 ? 'text-zinc-600' : 'text-zinc-100'}`}>
-                {daysRemaining === 0 ? 'TODAY' : daysRemaining > 0 ? `${daysRemaining} Days` : `${Math.abs(daysRemaining)} Days Ago`}
+                {daysRemaining === 0 ? (
+                  'TODAY'
+                ) : daysRemaining > 0 ? (
+                  <>
+                    <RollingNumber value={daysRemaining} /> Days
+                  </>
+                ) : (
+                  <>
+                    <RollingNumber value={Math.abs(daysRemaining)} /> Days Ago
+                  </>
+                )}
               </div>
               <p className="mt-1 text-xs sm:text-sm text-zinc-400 font-medium truncate">{exam.name || 'Target Exam'}</p>
             </div>

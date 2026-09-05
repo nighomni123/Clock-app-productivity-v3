@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import '@kitlangton/rolling-number/styles.css';
 
 // Register PWA Service Worker for offline support and push notifications
 if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {

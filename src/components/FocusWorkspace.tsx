@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, AlertTriangle, Maximize2, Minimize2, FileText, Check, Trash2, Plus, ListFilter } from 'lucide-react';
 import { UserSettings, TaskItem, DistractionItem } from '../types';
+import RollingClock from './RollingClock';
 import { playSound } from '../lib/audio';
 import { sendNotification } from '../lib/notifications';
 
@@ -79,6 +80,11 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
 
   const timeLeftRef = useRef(timeLeft);
   useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+  // Track the previous time so we can roll digits the correct way: down while the
+  // countdown is decreasing, up when it jumps (reset / mode switch / start).
+  const prevClockTimeRef = useRef(timeLeft);
+  useEffect(() => { prevClockTimeRef.current = timeLeft; });
 
   // Open a journal segment (Work entry) for a running focus block. The entry starts
   // now and its endTime is updated to the real stop moment, so it always reflects
@@ -359,6 +365,9 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const progress = sessionDuration ? ((sessionDuration - timeLeft) / sessionDuration) * 100 : 0;
   const activeLabel = mode === 'focus' ? 'Focus Block' : mode === 'longBreak' ? 'Long Break' : 'Short Break';
 
+  // Countdown digits should roll downward (decreasing); jumps roll upward.
+  const clockDirection: 'up' | 'down' = timeLeft < prevClockTimeRef.current ? 'down' : 'up';
+
   if (focusFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] h-screen w-screen flex flex-col items-center justify-between bg-zinc-950 p-2 sm:p-4 md:p-6 text-zinc-100 select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
@@ -443,7 +452,12 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
 
             {/* Display Clock - Centered along Y axis, sized dynamically with clamp */}
             <div className="my-1 sm:my-2 font-extralight tracking-tighter tabular-nums text-zinc-100 font-mono text-[clamp(3.5rem,20vh,11rem)] leading-none drop-shadow-[0_10px_35px_rgba(0,0,0,0.8)] text-center">
-              {formatClock(timeLeft)}
+              <RollingClock
+                text={formatClock(timeLeft)}
+                clockAnimation={settings.clockAnimation}
+                direction={clockDirection}
+                ariaLabel={`${activeLabel} time remaining: ${formatClock(timeLeft)}`}
+              />
             </div>
 
             {/* Controls & Progress Column - Always Stacked BELOW the Clock */}
@@ -610,7 +624,12 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
                 focusFullscreen ? 'text-[22vw] leading-none md:text-[13rem]' : 'text-7xl md:text-9xl'
               }`}
             >
-              {formatClock(timeLeft)}
+              <RollingClock
+                text={formatClock(timeLeft)}
+                clockAnimation={settings.clockAnimation}
+                direction={clockDirection}
+                ariaLabel={`${activeLabel} time remaining: ${formatClock(timeLeft)}`}
+              />
             </div>
 
             {/* Session Intention */}

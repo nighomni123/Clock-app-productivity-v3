@@ -4,6 +4,7 @@ import { UserSettings, DailyTarget, DailyStats, UserAuth, WeeklyInsightsData } f
 import { SOUND_NAMES, playSound } from '../lib/audio';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
 import { AiWeeklyInsightCard } from './AiWeeklyInsightCard';
+import { RollingNumber } from '@kitlangton/rolling-number/react';
 
 interface SettingsStatsProps {
   settings: UserSettings;
@@ -274,7 +275,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
               </div>
             </div>
             <div className="text-zinc-400">
-              Logged today: <strong className="text-zinc-100">{todayStats.focusMinutes}m</strong> / {dailyTarget.minutes}m
+              Logged today: <strong className="text-zinc-100"><RollingNumber value={todayStats.focusMinutes} />m</strong> / {dailyTarget.minutes}m
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
               <div
@@ -301,7 +302,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
               </div>
             </div>
             <div className="text-zinc-400">
-              Completed today: <strong className="text-zinc-100">{todayStats.sessions}</strong> / {dailyTarget.sessions}
+              Completed today: <strong className="text-zinc-100"><RollingNumber value={todayStats.sessions} /></strong> / {dailyTarget.sessions}
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
               <div
@@ -328,7 +329,7 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
               </div>
             </div>
             <div className="text-zinc-400">
-              Logged today: <strong className="text-zinc-100">{todayStats.distractions}</strong> / max {dailyTarget.maxDistractions}
+              Logged today: <strong className="text-zinc-100"><RollingNumber value={todayStats.distractions} /></strong> / max {dailyTarget.maxDistractions}
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
               <div
@@ -401,6 +402,26 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                 onChange={(e) => onUpdateSettings({ ...settings, sessionsBeforeLongBreak: Math.max(1, Number(e.target.value)) })}
                 className="w-16 rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-right outline-none"
               />
+            </label>
+
+            <label className="flex items-center justify-between text-zinc-300 border-t border-zinc-800/60 pt-3 cursor-pointer">
+              <span>Clock Animation</span>
+              <div className="flex rounded-full border border-zinc-800 bg-zinc-950 p-0.5">
+                {(['roll', 'static'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => onUpdateSettings({ ...settings, clockAnimation: opt })}
+                    className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
+                      settings.clockAnimation === opt
+                        ? 'bg-zinc-100 text-zinc-950 shadow'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    {opt === 'roll' ? 'Rolling' : 'Static'}
+                  </button>
+                ))}
+              </div>
             </label>
           </div>
         </section>

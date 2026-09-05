@@ -54,7 +54,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   autoStartFocus: false,
   enableNotifications: true,
   notificationLeadMinutes: 5,
-  strictMode: false
+  strictMode: false,
+  clockAnimation: 'roll'
 };
 
 const DEFAULT_DAILY_TARGET: DailyTarget = {
@@ -1094,6 +1095,7 @@ export default function App() {
             onUpdateExam={handleUpdateExam}
             intention={intention}
             onUpdateIntention={handleUpdateIntention}
+            clockAnimation={settings.clockAnimation}
           />
         )}
 

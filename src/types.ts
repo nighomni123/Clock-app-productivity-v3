@@ -10,6 +10,8 @@ export interface UserSettings {
   enableNotifications: boolean;
   notificationLeadMinutes: number;
   strictMode: boolean;
+  /** Animation style for the focus/wall clock displays. */
+  clockAnimation: 'roll' | 'static';
 }
 
 export interface ExamState {
