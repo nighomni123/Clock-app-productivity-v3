@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import '@kitlangton/rolling-number/styles.css';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Register PWA Service Worker for offline support and push notifications
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -15,7 +16,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );
 
