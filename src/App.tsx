@@ -203,7 +203,7 @@ export default function App() {
     const unsub = onSnapshot(doc(db, 'sync_sessions', syncCode), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.settings) setSettings(data.settings);
+        if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
         if (data.exam) setExam(data.exam);
         if (data.intention !== undefined) setIntention(data.intention);
         if (data.tasks) setTasks(data.tasks);

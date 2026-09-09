@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import type { Scene, UserSettings } from '../types';
+import type { AmbienceSettings, Scene, UserSettings } from '../types';
 import { getScene, NONE_SCENE_ID } from '../lib/scenes';
 import { primeAudio, setScene, setVolume } from '../lib/ambientAudio';
 
@@ -45,8 +45,17 @@ export const AmbienceProvider: React.FC<AmbienceProviderProps> = ({
   onUpdateSettings,
   children,
 }) => {
-  const { ambience } = settings;
   const reducedMotion = usePrefersReducedMotion();
+
+  // Defensive normalization: persisted settings from older app versions, sync
+  // peers, or partial saves may predate the `ambience` field (or omit some of
+  // its keys). Normalize so we never read `undefined.sceneId` etc.
+  const ambience: AmbienceSettings = {
+    sceneId: settings.ambience?.sceneId ?? NONE_SCENE_ID,
+    enabled: settings.ambience?.enabled ?? false,
+    volume:
+      typeof settings.ambience?.volume === 'number' ? settings.ambience.volume : 0.15,
+  };
 
   const scene = useMemo(() => getScene(ambience.sceneId), [ambience.sceneId]);
 
