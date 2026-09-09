@@ -305,12 +305,12 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
     <>
       <canvas
         ref={canvasRef}
-        className="fixed inset-0 -z-10 pointer-events-none aria-hidden"
+        className="fixed inset-0 z-0 pointer-events-none"
         aria-hidden="true"
         style={{ background: '#05060a' }}
       />
       {/* Favourite / replay controls */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end">
+      <div className="fixed top-4 right-4 z-[60] flex flex-col gap-3 items-end">
         <button
           onClick={() => {
             const fav: ShaderFavourite = { id: Date.now().toString(), mode: (mode as 'fbm' | 'phyllotaxis'), seed: sessionSeedRef.current, savedAt: Date.now() };
@@ -318,12 +318,24 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
             setFavourites(next.slice(0, 8));
             try { localStorage.setItem('shader_favourites', JSON.stringify(next.slice(0, 8))); } catch {}
           }}
-          className="px-2.5 py-1 text-[10px] font-medium bg-black/60 text-amber-300 border border-amber-700/30 rounded-full hover:bg-amber-900/40 hover:text-amber-200 transition-colors shadow-lg backdrop-blur-sm"
-          aria-label="Star current shader design"
-          title="Star current design (variables saved)"
-        >
-          ★ Star
-        </button>
+          className="w-11 h-11 rounded-full bg-black/70 text-amber-300 border border-amber-700/30 shadow-xl backdrop-blur-md hover:bg-amber-900/50 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400/60 flex items-center justify-center text-xl"
+          aria-label="Star current background design"
+          title="Star — variables saved, replay anytime"
+        >★</button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { window.location.reload(); }}
+            className="w-11 h-11 rounded-full bg-zinc-900/90 text-zinc-200 border border-zinc-600/30 shadow-lg backdrop-blur-md hover:bg-zinc-800 transition-all focus:outline-none focus:ring-2 focus:ring-zinc-400/60 flex items-center justify-center text-xs font-semibold"
+            aria-label="Refresh design (new random seed)"
+            title="Refresh — new random design each load"
+          >↻</button>
+          <button
+            onClick={() => { sessionSeedRef.current = Math.random() * 100000; }}
+            className="w-11 h-11 rounded-full bg-zinc-900/90 text-zinc-200 border border-zinc-600/30 shadow-lg backdrop-blur-md hover:bg-zinc-800 transition-all focus:outline-none focus:ring-2 focus:ring-zinc-400/60 flex items-center justify-center text-xs font-semibold"
+            aria-label="Randomise seed"
+            title="Randomise seed — fresh design"
+          >✦</button>
+        </div>
         {favourites.length > 0 && (
           <div className="flex flex-wrap gap-1 justify-end max-w-[12rem]">
             {favourites.map((f) => (
