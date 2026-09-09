@@ -22,32 +22,35 @@ export const NONE_SCENE_ID = 'none';
  * All `file` loops below are CC0 or CC-BY (attribution in
  * `public/themes/audio/ATTRIBUTIONS.md`). CC-BY assets require the credit
  * shown there; CC0 assets are public domain and need no attribution.
+ *
+ * Backgrounds are intentionally VIBRANT and happy — bright, saturated
+ * multi-stop gradients that read as cheerful, energising study vibes.
  */
 export const SCENES: Scene[] = [
   {
     id: 'rainy-window',
-    name: 'Rainy Window',
-    mood: 'Calm focus in the rain',
+    name: 'Sunny Window',
+    mood: 'Bright, cheerful morning light',
     thumbnailGradient:
-      'linear-gradient(160deg, #1e293b 0%, #334155 45%, #475569 100%)',
+      'linear-gradient(160deg, #38bdf8 0%, #0ea5e9 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 50% 0%, #243042 0%, #1b2533 55%, #0f1620 100%)',
+        'radial-gradient(120% 120% at 50% 0%, #38bdf8 0%, #0ea5e9 55%, #fde68a 100%)',
     },
     audio: { kind: 'file', src: '/themes/audio/rain_window.wav' },
     defaultVolume: 0.18,
   },
   {
     id: 'quiet-meadow',
-    name: 'Quiet Meadow',
-    mood: 'Soft wind, open sky',
+    name: 'Sunny Meadow',
+    mood: 'Open, airy, carefree calm',
     thumbnailGradient:
-      'linear-gradient(160deg, #a7f3d0 0%, #5eead4 50%, #0ea5a4 100%)',
+      'linear-gradient(160deg, #34d399 0%, #6ee7b7 100%)',
     background: {
       type: 'gradient',
       value:
-        'linear-gradient(180deg, #bae6fd 0%, #a7f3d0 45%, #fef9c3 100%)',
+        'linear-gradient(180deg, #34d399 0%, #10b981 50%, #fef08a 100%)',
     },
     // CC-BY 3.0 — see ATTRIBUTIONS.md.
     audio: { kind: 'file', src: '/themes/audio/meadow_wind.ogg' },
@@ -55,14 +58,14 @@ export const SCENES: Scene[] = [
   },
   {
     id: 'forest-grove',
-    name: 'Forest Grove',
-    mood: 'Birdsong & leaves',
+    name: 'Lush Forest',
+    mood: 'Fresh, green, alive',
     thumbnailGradient:
-      'linear-gradient(160deg, #14532d 0%, #166534 50%, #052e16 100%)',
+      'linear-gradient(160deg, #22c55e 0%, #16a34a 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 30% 20%, #1b4332 0%, #14532d 50%, #052e16 100%)',
+        'radial-gradient(120% 120% at 30% 20%, #22c55e 0%, #16a34a 50%, #065f46 100%)',
     },
     // CC0 seamless loop.
     audio: { kind: 'file', src: '/themes/audio/forest_ambience.mp3' },
@@ -70,14 +73,14 @@ export const SCENES: Scene[] = [
   },
   {
     id: 'cozy-library',
-    name: 'Cozy Library',
-    mood: 'Warm fireplace, hushed study',
+    name: 'Warm Sunset',
+    mood: 'Golden-hour glow',
     thumbnailGradient:
-      'linear-gradient(160deg, #78350f 0%, #92400e 50%, #451a03 100%)',
+      'linear-gradient(160deg, #fb923c 0%, #f97316 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 70% 20%, #4c2a12 0%, #3a1f0c 55%, #1c1206 100%)',
+        'radial-gradient(120% 120% at 70% 20%, #fb923c 0%, #f97316 55%, #f43f5e 100%)',
     },
     // CC-BY 4.0 — see ATTRIBUTIONS.md.
     audio: { kind: 'file', src: '/themes/audio/library_fireplace.ogg' },
@@ -85,14 +88,14 @@ export const SCENES: Scene[] = [
   },
   {
     id: 'snowfall-dusk',
-    name: 'Snowfall at Dusk',
-    mood: 'Still, gentle hush',
+    name: 'Cotton Candy',
+    mood: 'Soft pastel daydream',
     thumbnailGradient:
-      'linear-gradient(160deg, #475569 0%, #64748b 50%, #cbd5e1 100%)',
+      'linear-gradient(160deg, #818cf8 0%, #c084fc 100%)',
     background: {
       type: 'gradient',
       value:
-        'linear-gradient(180deg, #334155 0%, #64748b 60%, #cbd5e1 100%)',
+        'linear-gradient(180deg, #818cf8 0%, #c084fc 60%, #f9a8d4 100%)',
     },
     // CC0 gentle wind.
     audio: { kind: 'file', src: '/themes/audio/snowfall_wind.wav' },
@@ -100,14 +103,14 @@ export const SCENES: Scene[] = [
   },
   {
     id: 'seaside-cliff',
-    name: 'Seaside Cliff',
-    mood: 'Waves & salt air',
+    name: 'Tropical Beach',
+    mood: 'Salty, sunny, bright',
     thumbnailGradient:
-      'linear-gradient(160deg, #0c4a6e 0%, #0891b2 50%, #67e8f9 100%)',
+      'linear-gradient(160deg, #06b6d4 0%, #34d399 100%)',
     background: {
       type: 'gradient',
       value:
-        'linear-gradient(180deg, #0c4a6e 0%, #0891b2 55%, #a5f3fc 100%)',
+        'linear-gradient(180deg, #06b6d4 0%, #0891b2 55%, #34d399 100%)',
     },
     // CC-BY 3.0 — see ATTRIBUTIONS.md.
     audio: { kind: 'file', src: '/themes/audio/seaside_waves.ogg' },
@@ -116,18 +119,17 @@ export const SCENES: Scene[] = [
 
   // --- Royalty-free music scenes (all CC0 unless noted) --------------------
   // These give the user selectable, endlessly-looping focus music on top of
-  // the ambient soundscapes above. Backgrounds are gradients; swap in
-  // `/themes/images/<id>.webp` if illustrated art is added later.
+  // the ambient soundscapes above. Backgrounds are vibrant gradients.
   {
     id: 'lofi-lounge',
     name: 'Lo-Fi Lounge',
-    mood: 'Chill beats for focus',
+    mood: 'Chill but colourful',
     thumbnailGradient:
-      'linear-gradient(160deg, #312e81 0%, #6d28d9 50%, #db2777 100%)',
+      'linear-gradient(160deg, #ec4899 0%, #f59e0b 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 50% 10%, #4c1d95 0%, #2e1065 55%, #0b0b1a 100%)',
+        'radial-gradient(120% 120% at 50% 10%, #ec4899 0%, #f59e0b 55%, #f43f5e 100%)',
     },
     // CC0 chill loop.
     audio: { kind: 'file', src: '/themes/audio/music_lofi.mp3' },
@@ -136,13 +138,13 @@ export const SCENES: Scene[] = [
   {
     id: 'neo-piano',
     name: 'Neo-Classical Piano',
-    mood: 'Gentle solo piano',
+    mood: 'Bright solo piano',
     thumbnailGradient:
-      'linear-gradient(160deg, #0f172a 0%, #1e3a8a 50%, #e0e7ff 100%)',
+      'linear-gradient(160deg, #3b82f6 0%, #60a5fa 100%)',
     background: {
       type: 'gradient',
       value:
-        'linear-gradient(180deg, #0f172a 0%, #1e3a8a 55%, #c7d2fe 100%)',
+        'linear-gradient(180deg, #3b82f6 0%, #60a5fa 55%, #fbbf24 100%)',
     },
     // CC0 piano loop.
     audio: { kind: 'file', src: '/themes/audio/music_piano.wav' },
@@ -151,13 +153,13 @@ export const SCENES: Scene[] = [
   {
     id: 'ambient-drift',
     name: 'Ambient Drift',
-    mood: 'Weightless pad',
+    mood: 'Floaty pastel pad',
     thumbnailGradient:
-      'linear-gradient(160deg, #042f2e 0%, #0d9488 50%, #a5f3fc 100%)',
+      'linear-gradient(160deg, #22c55e 0%, #14b8a6 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 30% 20%, #042f2e 0%, #0d9488 55%, #083344 100%)',
+        'radial-gradient(120% 120% at 30% 20%, #22c55e 0%, #14b8a6 55%, #3b82f6 100%)',
     },
     // CC0 seamless pad loop.
     audio: { kind: 'file', src: '/themes/audio/music_ambient_drift.ogg' },
@@ -166,13 +168,13 @@ export const SCENES: Scene[] = [
   {
     id: 'deep-focus',
     name: 'Deep Focus',
-    mood: 'Warm sustained pad',
+    mood: 'Warm golden energy',
     thumbnailGradient:
-      'linear-gradient(160deg, #451a03 0%, #b45309 50%, #fde68a 100%)',
+      'linear-gradient(160deg, #f59e0b 0%, #f97316 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 70% 20%, #451a03 0%, #92400e 55%, #1c1206 100%)',
+        'radial-gradient(120% 120% at 70% 20%, #f59e0b 0%, #f97316 55%, #ea580c 100%)',
     },
     // CC0 seamless pad loop.
     audio: { kind: 'file', src: '/themes/audio/music_deep_focus.ogg' },
@@ -181,13 +183,13 @@ export const SCENES: Scene[] = [
   {
     id: 'midnight-drift',
     name: 'Midnight Drift',
-    mood: 'Moody ambient drone',
+    mood: 'Dreamy neon haze',
     thumbnailGradient:
-      'linear-gradient(160deg, #0b0b1a 0%, #2e1065 50%, #4c1d95 100%)',
+      'linear-gradient(160deg, #8b5cf6 0%, #d946ef 100%)',
     background: {
       type: 'gradient',
       value:
-        'radial-gradient(120% 120% at 50% 0%, #1e1b4b 0%, #2e1065 55%, #0b0b1a 100%)',
+        'radial-gradient(120% 120% at 50% 0%, #8b5cf6 0%, #d946ef 55%, #06b6d4 100%)',
     },
     // CC0 seamless drone loop (moodier — good for night sessions).
     audio: { kind: 'file', src: '/themes/audio/music_midnight.ogg' },

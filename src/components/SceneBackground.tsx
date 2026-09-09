@@ -14,10 +14,10 @@ export const SceneBackground: React.FC<{ variant?: 'app' | 'focus' | 'clock' }> 
 
   const scrim =
     variant === 'focus'
-      ? 'bg-black/55'
+      ? 'bg-black/35'
       : variant === 'clock'
-        ? 'bg-black/45'
-        : 'bg-black/40';
+        ? 'bg-black/30'
+        : 'bg-black/25';
 
   const style =
     scene.background.type === 'image'

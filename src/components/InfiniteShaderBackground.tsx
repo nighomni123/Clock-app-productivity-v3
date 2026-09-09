@@ -52,6 +52,12 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         return fract(sin(h) * 43758.5453123);
       }
 
+      vec3 hsv2rgb(vec3 c) {
+        vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+        vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+      }
+
       void main() {
         // Center of screen in [0,1]
         vec2 center = vec2(0.5, 0.5) + vec2(sin(u_time * 0.0005), cos(u_time * 0.0003)) * 0.05;
@@ -60,31 +66,38 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         float r = length(p);
         float theta = atan(p.y, p.x);
 
-        // Golden angle (~137.508° in radians)
-        float seedOffset = u_seed * 0.1;
-        float goldenAngle = 2.39996322972865332 + seedOffset * 0.5;
-        float maxDots = 350.0;
-        float dotSize = 0.003;
+        // Golden-angle sunflower spiral that actually fills the screen.
+        // Dot size scales with sqrt(t) so packing density is uniform and
+        // neighbouring dots stay discrete instead of merging into a wash.
+        float goldenAngle = 2.39996322972865332;
+        float maxDots = 120.0;
+        float maxR = 0.60;
 
         float intensity = 0.0;
-        float baseColor = 0.10;
+        vec3 dotColor = vec3(0.0);
+        float dotW = 0.0;
 
         for (float i = 0.0; i < maxDots; i++) {
           float t = i / maxDots;
-          float spiralR = 0.35 * sqrt(i); // Fibonacci/spiral growth
-          float spiralTheta = t * goldenAngle * 12.0 + u_time * 0.1;
-          vec2 dotPos = center + vec2(cos(spiralTheta), sin(spiralTheta)) * spiralR;
+          float dsize = 0.005 + 0.014 * sqrt(t);    // uniform-density dots
+          float r = sqrt(t) * maxR;                 // even fill from centre outward
+          float a = i * goldenAngle + u_time * 0.04; // gentle rotation
+          vec2 dotPos = center + vec2(cos(a), sin(a)) * r;
           float dist = distance(uv, dotPos);
-          float alpha = smoothstep(dotSize, dotSize * 0.3, dist);
-          // Subtle color variation per dot using index hash
-          float hueShift = hash(vec2(i, 42.0)) * 0.08;
-          vec3 color = mix(vec3(0.10, 0.13, 0.18), vec3(0.14, 0.16, 0.20), hueShift);
-          intensity += alpha * mix(0.3, 0.7, t);
-          baseColor += alpha * 0.005;
+          float alpha = 1.0 - smoothstep(dsize * 0.55, dsize, dist);
+          // Vibrant rainbow spiral: each dot gets a hue from its index
+          float dotHue = fract(i * 0.013 + u_seed * 0.001 + u_time * 0.02);
+          vec3 dcol = hsv2rgb(vec3(dotHue, 1.0, 1.0));
+          dotColor += dcol * alpha;
+          dotW += alpha;
+          intensity += alpha;
         }
 
-        float bg = 0.10 + 0.03 * sin(u_time * 0.005) * cos(u_time * 0.003);
-        vec3 finalColor = mix(vec3(bg), vec3(0.20, 0.24, 0.30) + intensity * 0.25, 0.6);
+        // dark, low-value backdrop so the bright rainbow dots pop into a clear spiral
+        vec3 bgCol = mix(vec3(0.04, 0.01, 0.12), vec3(0.01, 0.05, 0.14),
+                        0.5 + 0.5 * sin(u_time * 0.01));
+        vec3 dots = dotW > 0.0 ? dotColor / dotW : bgCol;
+        vec3 finalColor = mix(bgCol, dots, clamp(intensity * 6.0, 0.0, 0.98));
         outColor = vec4(finalColor, 1.0);
       }
     `;
@@ -135,6 +148,12 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         return fbm(p + vec2(w, h) * 0.4);
       }
 
+      vec3 hsv2rgb(vec3 c) {
+        vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+        vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+      }
+
       void main() {
         vec2 uv = v_uv; // v_uv is in [-1,1] for full-screen quad
         // Map to [0,1] with a slight zoom/shift for calm motion
@@ -144,15 +163,17 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
 
         float seedOffset = u_seed * 0.1;
         float n = domainWarp(p * 2.0 + vec2(seedOffset, seedOffset * 0.7));
-        // Dark premium palette: very low saturation, muted teal/amber accents
-        float base = 0.10; // visible dark premium base
-        float accent = smoothstep(0.35, 0.65, n) * 0.35;
-        float tone = mix(vec3(0.14, 0.18, 0.24), vec3(0.28, 0.35, 0.42), n);
-        vec3 color = mix(vec3(base), tone + vec3(0.06, 0.10, 0.14) * accent, 0.7);
-        // Slow hue drift over time (very subtle)
-        float hueShift = 0.01 * sin(u_time * 0.01);
-        color.r += hueShift;
-        color.g -= hueShift * 0.5;
+        // Vibrant, happy palette: a rainbow that flows across the screen and
+        // drifts with time. High, consistent saturation/value = cheerful, not moody.
+        float accent = smoothstep(0.25, 0.9, n);
+        float hue = fract(0.55 + 0.35 * (uv.x + uv.y) + n * 0.6 + u_time * 0.02 + u_seed * 0.0017);
+        float sat = 0.95;
+        float val = 0.95 + 0.05 * accent;
+        vec3 color = hsv2rgb(vec3(hue, sat, val));
+        // a second, slower hue layer adds depth without dulling it
+        vec3 color2 = hsv2rgb(vec3(fract(hue + 0.35), 0.80, 1.0));
+        color = mix(color, color2, 0.15);
+        color *= 0.95 + 0.05 * sin(u_time * 0.05);
 
         outColor = vec4(color, 1.0);
       }
@@ -203,7 +224,7 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
 
     programRef.current = prog;
     return () => {};
-  }, []);
+  }, [mode]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -305,7 +326,7 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
     <>
       <canvas
         ref={canvasRef}
-        className="fixed inset-0 z-0 pointer-events-none"
+        className="fixed inset-0 -z-10 pointer-events-none"
         aria-hidden="true"
         style={{ background: '#05060a' }}
       />
