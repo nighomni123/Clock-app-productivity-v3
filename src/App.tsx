@@ -13,6 +13,8 @@ import { TaskQueue } from './components/TaskQueue';
 import { SettingsStats } from './components/SettingsStats';
 import { AuthModal } from './components/AuthModal';
 import { ActivityJournal } from './components/ActivityJournal';
+import { AmbienceProvider } from './context/AmbienceContext';
+import { SceneBackground } from './components/SceneBackground';
 import {
   UserSettings,
   ExamState,
@@ -55,7 +57,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   enableNotifications: true,
   notificationLeadMinutes: 5,
   strictMode: false,
-  clockAnimation: 'roll'
+  clockAnimation: 'roll',
+  ambience: { sceneId: 'none', enabled: false, volume: 0.15 }
 };
 
 const DEFAULT_DAILY_TARGET: DailyTarget = {
@@ -1077,8 +1080,12 @@ export default function App() {
   }, [activityLogs, tasks, distractions, dailyTarget.minutes]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-zinc-100 font-sans selection:bg-zinc-800">
-      {/* Top Navbar */}
+    <AmbienceProvider settings={settings} onUpdateSettings={handleUpdateSettings}>
+      <div className="min-h-screen flex flex-col bg-black text-zinc-100 font-sans selection:bg-zinc-800">
+        {/* Themed background for the whole app (renders nothing when ambience is off) */}
+        <SceneBackground variant="app" />
+
+        {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -1190,6 +1197,7 @@ export default function App() {
       {/* Vercel Web Analytics */}
       <Analytics />
       <SpeedInsights />
-    </div>
+      </div>
+    </AmbienceProvider>
   );
 }

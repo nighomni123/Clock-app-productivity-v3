@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, AlertTriangle, Maximize2, Minimize2, FileText, Check, Trash2, Plus, ListFilter } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Play, Pause, RotateCcw, AlertTriangle, Maximize2, Minimize2, FileText, Check, Trash2, Plus, ListFilter, Palette, Sparkles } from 'lucide-react';
 import { UserSettings, TaskItem, DistractionItem } from '../types';
 import RollingClock from './RollingClock';
 import { playSound } from '../lib/audio';
 import { sendNotification } from '../lib/notifications';
+import { SceneBackground } from './SceneBackground';
+import { SceneGallery } from './SceneGallery';
+import { useAmbience } from '../context/AmbienceContext';
 
 interface FocusWorkspaceProps {
   settings: UserSettings;
@@ -64,6 +68,8 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const [focusFullscreen, setFocusFullscreen] = useState(false);
   const [showFsDistractionModal, setShowFsDistractionModal] = useState(false);
   const [fsDistractionInput, setFsDistractionInput] = useState('');
+  const [showSceneSwitcher, setShowSceneSwitcher] = useState(false);
+  const { enabled: ambienceEnabled, toggleEnabled: toggleAmbience } = useAmbience();
 
   const endTimeRef = useRef(0);
   const completionLockRef = useRef(false);
@@ -371,6 +377,9 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   if (focusFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] h-screen w-screen flex flex-col items-center justify-between bg-zinc-950 p-2 sm:p-4 md:p-6 text-zinc-100 select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        {/* Themed background (renders nothing when ambience is off) */}
+        <SceneBackground variant="focus" />
+
         {/* Ambient Progress Fill */}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 bg-zinc-900/50 transition-all duration-500 ease-linear"
@@ -416,6 +425,50 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
             <Minimize2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span className="hidden sm:inline">Exit</span>
             <kbd className="hidden sm:inline-block rounded bg-zinc-800 px-1 py-0.5 text-[9px] text-zinc-400 border border-zinc-700/60">ESC</kbd>
+          </button>
+        </div>
+
+        {/* Scene quick-switcher (bottom-right) */}
+        <div className="absolute bottom-4 right-4 z-30 flex flex-col items-end gap-2">
+          <AnimatePresence>
+            {showSceneSwitcher && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 12 }}
+                transition={{ duration: 0.18 }}
+                className="w-72 rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-3 shadow-2xl backdrop-blur-md"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-200">
+                    <Sparkles className="h-3.5 w-3.5 text-zinc-400" /> Scenes
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleAmbience}
+                    aria-pressed={ambienceEnabled}
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition ${
+                      ambienceEnabled
+                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                        : 'bg-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    {ambienceEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+                <SceneGallery compact />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="button"
+            onClick={() => setShowSceneSwitcher((s) => !s)}
+            aria-label="Switch scene"
+            aria-expanded={showSceneSwitcher}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800/80 bg-zinc-900/80 text-zinc-300 backdrop-blur-md transition hover:border-zinc-700 hover:text-white"
+          >
+            <Palette className="h-4 w-4" />
           </button>
         </div>
 
