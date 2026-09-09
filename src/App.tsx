@@ -15,6 +15,7 @@ import { AuthModal } from './components/AuthModal';
 import { ActivityJournal } from './components/ActivityJournal';
 import { AmbienceProvider } from './context/AmbienceContext';
 import { SceneBackground } from './components/SceneBackground';
+import { InfiniteShaderBackground } from './components/InfiniteShaderBackground';
 import {
   UserSettings,
   ExamState,
@@ -1083,6 +1084,7 @@ export default function App() {
     <AmbienceProvider settings={settings} onUpdateSettings={handleUpdateSettings}>
       <div className="min-h-screen flex flex-col bg-black text-zinc-100 font-sans selection:bg-zinc-800">
         {/* Themed background for the whole app (renders nothing when ambience is off) */}
+        <InfiniteShaderBackground />
         <SceneBackground variant="app" />
 
         {/* Top Navbar */}
