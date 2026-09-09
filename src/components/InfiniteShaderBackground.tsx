@@ -67,7 +67,7 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         float dotSize = 0.003;
 
         float intensity = 0.0;
-        float baseColor = 0.03;
+        float baseColor = 0.10;
 
         for (float i = 0.0; i < maxDots; i++) {
           float t = i / maxDots;
@@ -83,8 +83,8 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
           baseColor += alpha * 0.005;
         }
 
-        float bg = 0.02 + 0.01 * sin(u_time * 0.005) * cos(u_time * 0.003);
-        vec3 finalColor = mix(vec3(bg), vec3(0.08, 0.09, 0.11) + intensity * 0.06, 0.6);
+        float bg = 0.10 + 0.03 * sin(u_time * 0.005) * cos(u_time * 0.003);
+        vec3 finalColor = mix(vec3(bg), vec3(0.20, 0.24, 0.30) + intensity * 0.25, 0.6);
         outColor = vec4(finalColor, 1.0);
       }
     `;
@@ -145,10 +145,10 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         float seedOffset = u_seed * 0.1;
         float n = domainWarp(p * 2.0 + vec2(seedOffset, seedOffset * 0.7));
         // Dark premium palette: very low saturation, muted teal/amber accents
-        float base = 0.03; // near-black base
-        float accent = smoothstep(0.4, 0.6, n) * 0.15;
-        float tone = mix(vec3(0.08, 0.11, 0.14), vec3(0.10, 0.12, 0.16), n);
-        vec3 color = mix(vec3(base), tone + vec3(0.02, 0.03, 0.04) * accent, 0.7);
+        float base = 0.10; // visible dark premium base
+        float accent = smoothstep(0.35, 0.65, n) * 0.35;
+        float tone = mix(vec3(0.14, 0.18, 0.24), vec3(0.28, 0.35, 0.42), n);
+        vec3 color = mix(vec3(base), tone + vec3(0.06, 0.10, 0.14) * accent, 0.7);
         // Slow hue drift over time (very subtle)
         float hueShift = 0.01 * sin(u_time * 0.01);
         color.r += hueShift;
@@ -310,7 +310,7 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         style={{ background: '#05060a' }}
       />
       {/* Favourite / replay controls */}
-      <div className="fixed bottom-16 right-4 z-50 flex flex-col gap-2 items-end">
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end">
         <button
           onClick={() => {
             const fav: ShaderFavourite = { id: Date.now().toString(), mode: (mode as 'fbm' | 'phyllotaxis'), seed: sessionSeedRef.current, savedAt: Date.now() };
