@@ -60,7 +60,8 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
 
       void main() {
         // Center of screen in [0,1]
-        vec2 center = vec2(0.5, 0.5) + vec2(sin(u_time * 0.0005), cos(u_time * 0.0003)) * 0.05;
+        vec2 center = vec2(0.5, 0.5) + vec2(sin(u_time * 0.0005), cos(u_time * 0.0003)) * 0.03;
+         float aspect = u_resolution.x / max(u_resolution.y, 1.0);
         vec2 uv = v_uv * 0.5 + 0.5; // [-1,1] -> [0,1]
         vec2 p = uv - center;
         float r = length(p);
@@ -70,8 +71,8 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         // Dot size scales with sqrt(t) so packing density is uniform and
         // neighbouring dots stay discrete instead of merging into a wash.
         float goldenAngle = 2.39996322972865332;
-        float maxDots = 120.0;
-        float maxR = 0.60;
+        float maxDots = 600.0;
+        float maxR = 0.56;
 
         float intensity = 0.0;
         vec3 dotColor = vec3(0.0);
@@ -79,14 +80,16 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
 
         for (float i = 0.0; i < maxDots; i++) {
           float t = i / maxDots;
-          float dsize = 0.005 + 0.014 * sqrt(t);    // uniform-density dots
+          float dsize = 0.010 + 0.013 * sqrt(t);            // larger seeds -> packed head, arms read as bands
           float r = sqrt(t) * maxR;                 // even fill from centre outward
-          float a = i * goldenAngle + u_time * 0.04; // gentle rotation
-          vec2 dotPos = center + vec2(cos(a), sin(a)) * r;
-          float dist = distance(uv, dotPos);
-          float alpha = 1.0 - smoothstep(dsize * 0.55, dsize, dist);
-          // Vibrant rainbow spiral: each dot gets a hue from its index
-          float dotHue = fract(i * 0.013 + u_seed * 0.001 + u_time * 0.02);
+          float a = i * goldenAngle + u_time * 0.03;        // slow rotation
+          vec2 qpos = vec2(cos(a), sin(a)) * r;             // position in aspect space
+          vec2 dotUv = center + qpos / vec2(aspect, 1.0);   // back to screen uv
+           vec2 diff = (uv - dotUv) * vec2(aspect, 1.0);    // isotropic distance
+           float dist = length(diff);
+          float alpha = 1.0 - smoothstep(dsize * 0.5, dsize, dist);
+          // Hue steps by the golden-ratio conjugate so neighbouring seeds share a hue -> arms read as colour bands
+          float dotHue = fract(i / 13.0 + u_seed * 0.001 + u_time * 0.01);
           vec3 dcol = hsv2rgb(vec3(dotHue, 1.0, 1.0));
           dotColor += dcol * alpha;
           dotW += alpha;
@@ -94,11 +97,15 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; 
         }
 
         // dark, low-value backdrop so the bright rainbow dots pop into a clear spiral
-        vec3 bgCol = mix(vec3(0.04, 0.01, 0.12), vec3(0.01, 0.05, 0.14),
+        vec3 bgCol = mix(vec3(0.05, 0.02, 0.14), vec3(0.02, 0.06, 0.16),
                         0.5 + 0.5 * sin(u_time * 0.01));
         vec3 dots = dotW > 0.0 ? dotColor / dotW : bgCol;
-        vec3 finalColor = mix(bgCol, dots, clamp(intensity * 6.0, 0.0, 0.98));
-        outColor = vec4(finalColor, 1.0);
+        // soft violet glow at the core to anchor the sunflower head
+         vec2 cdiff = (uv - center) * vec2(aspect, 1.0);
+         float core = 1.0 - smoothstep(0.0, 0.16, length(cdiff));
+         vec3 col = mix(bgCol, dots, clamp(intensity * 5.0, 0.0, 0.98));
+         col += core * vec3(0.22, 0.16, 0.34);
+        outColor = vec4(col, 1.0);
       }
     `;
 
