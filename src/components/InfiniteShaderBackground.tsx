@@ -8,13 +8,27 @@ import React, { useRef, useEffect, useCallback } from 'react';
  * Respects prefers-reduced-motion (freezes to static seed) and pauses
  * when the tab is hidden.
  */
-export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }> = ({ mode = 'fbm' }) => {
+export interface ShaderFavourite {
+  id: string;
+  mode: 'fbm' | 'phyllotaxis';
+  seed: number;
+  savedAt: number;
+}
+
+export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis'; seed?: number }> = ({ mode = 'fbm', seed }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const glRef = useRef<WebGL2RenderingContext | null>(null);
   const programRef = useRef<WebGLProgram | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(Date.now());
+  const sessionSeedRef = useRef<number>(seed ?? Math.random() * 100000);
   const reducedMotionRef = useRef<boolean>(false);
+  const [favourites, setFavourites] = React.useState<ShaderFavourite[]>(() => {
+    try {
+      const raw = localStorage.getItem('shader_favourites');
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
 
   const initShader = useCallback((gl: WebGL2RenderingContext) => {
     const vsSource = `#version 300 es
@@ -30,6 +44,7 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }
       in vec2 v_uv;
       out vec4 outColor;
       uniform float u_time;
+      uniform float u_seed;
       uniform vec2 u_resolution;
 
       float hash(vec2 p) {
@@ -46,7 +61,8 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }
         float theta = atan(p.y, p.x);
 
         // Golden angle (~137.508° in radians)
-        float goldenAngle = 2.39996322972865332;
+        float seedOffset = u_seed * 0.1;
+        float goldenAngle = 2.39996322972865332 + seedOffset * 0.5;
         float maxDots = 350.0;
         float dotSize = 0.003;
 
@@ -78,6 +94,7 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }
       in vec2 v_uv;
       out vec4 outColor;
       uniform float u_time;
+      uniform float u_seed;
       uniform vec2 u_resolution;
 
       // Simple pseudo-random
@@ -125,7 +142,8 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }
         p.x += u_time * 0.002;
         p.y += u_time * 0.001;
 
-        float n = domainWarp(p * 2.0);
+        float seedOffset = u_seed * 0.1;
+        float n = domainWarp(p * 2.0 + vec2(seedOffset, seedOffset * 0.7));
         // Dark premium palette: very low saturation, muted teal/amber accents
         float base = 0.03; // near-black base
         float accent = smoothstep(0.4, 0.6, n) * 0.15;
@@ -212,8 +230,10 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }
 
     const uTimeLoc = gl.getUniformLocation(prog, 'u_time');
     const uResLoc = gl.getUniformLocation(prog, 'u_resolution');
+    const uSeedLoc = gl.getUniformLocation(prog, 'u_seed');
     if (uTimeLoc) gl.uniform1f(uTimeLoc, time);
     if (uResLoc) gl.uniform2f(uResLoc, gl.canvas.width, gl.canvas.height);
+    if (uSeedLoc) gl.uniform1f(uSeedLoc, sessionSeedRef.current);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }, []);
@@ -282,11 +302,44 @@ export const InfiniteShaderBackground: React.FC<{ mode?: 'fbm' | 'phyllotaxis' }
   }, [initShader, resizeCanvas, animate]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 -z-10 pointer-events-none aria-hidden"
-      aria-hidden="true"
-      style={{ background: '#05060a' }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 -z-10 pointer-events-none aria-hidden"
+        aria-hidden="true"
+        style={{ background: '#05060a' }}
+      />
+      {/* Favourite / replay controls */}
+      <div className="fixed bottom-16 right-4 z-50 flex flex-col gap-2 items-end">
+        <button
+          onClick={() => {
+            const fav: ShaderFavourite = { id: Date.now().toString(), mode: (mode as 'fbm' | 'phyllotaxis'), seed: sessionSeedRef.current, savedAt: Date.now() };
+            const next = [fav, ...favourites.filter((f) => f.seed !== fav.seed || f.mode !== fav.mode)];
+            setFavourites(next.slice(0, 8));
+            try { localStorage.setItem('shader_favourites', JSON.stringify(next.slice(0, 8))); } catch {}
+          }}
+          className="px-2.5 py-1 text-[10px] font-medium bg-black/60 text-amber-300 border border-amber-700/30 rounded-full hover:bg-amber-900/40 hover:text-amber-200 transition-colors shadow-lg backdrop-blur-sm"
+          aria-label="Star current shader design"
+          title="Star current design (variables saved)"
+        >
+          ★ Star
+        </button>
+        {favourites.length > 0 && (
+          <div className="flex flex-wrap gap-1 justify-end max-w-[12rem]">
+            {favourites.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => { sessionSeedRef.current = f.seed; }}
+                className="px-2 py-0.5 text-[9px] font-medium bg-zinc-800/70 text-zinc-300 border border-zinc-600/20 rounded-full hover:bg-zinc-700/80 transition-colors"
+                aria-label={`Replay saved design: ${f.mode}`}
+                title={`Replay saved ${f.mode} design (seed ${Math.round(f.seed)})`}
+              >
+                {f.mode === 'phyllotaxis' ? '🌻' : '◈'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 };
