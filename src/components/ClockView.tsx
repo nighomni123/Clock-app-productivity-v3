@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, BookOpen, Target } from 'lucide-react';
 import { ExamState, UserSettings } from '../types';
 import RollingClock from './RollingClock';
-import { SceneBackground } from './SceneBackground';
 import { RollingNumber } from '@kitlangton/rolling-number/react';
 
 interface ClockViewProps {
@@ -39,9 +38,6 @@ export const ClockView: React.FC<ClockViewProps> = ({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center animate-in fade-in zoom-in-95 duration-500">
-      {/* Themed background (renders nothing when ambience is off) */}
-      <SceneBackground variant="clock" />
-
       {/* Big Digital Clock */}
       <div className="py-4 sm:py-8 md:py-14 text-center">
         <h1 className="text-5xl sm:text-7xl md:text-[8rem] lg:text-[10rem] font-extralight tracking-tighter text-zinc-100 tabular-nums">

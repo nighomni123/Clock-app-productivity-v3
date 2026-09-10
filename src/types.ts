@@ -12,51 +12,6 @@ export interface UserSettings {
   strictMode: boolean;
   /** Animation style for the focus/wall clock displays. */
   clockAnimation: 'roll' | 'static';
-  /** Themed background + ambient audio ("Scenes") subsystem. */
-  ambience: AmbienceSettings;
-}
-
-/**
- * A selectable "Scene": an illustrated background paired with a matching
- * ambient sound. Original/Painted-Worlds aesthetic (no third-party IP).
- */
-export interface SceneBackground {
-  type: 'gradient' | 'image';
-  /** CSS gradient string, or an image URL when type === 'image'. */
-  value: string;
-}
-
-export type SceneAudioSource =
-  | { kind: 'synth'; profile: AmbienceProfile }
-  | { kind: 'file'; src: string };
-
-export type AmbienceProfile =
-  | 'rain'
-  | 'forest'
-  | 'meadow'
-  | 'library'
-  | 'night'
-  | 'seaside';
-
-export interface Scene {
-  id: string;
-  name: string;
-  /** Short mood label shown under the name. */
-  mood: string;
-  /** CSS gradient used as the gallery thumbnail swatch. */
-  thumbnailGradient: string;
-  background: SceneBackground;
-  audio: SceneAudioSource;
-  /** Per-scene default volume (0..1) when first selected. */
-  defaultVolume?: number;
-}
-
-export interface AmbienceSettings {
-  /** 'none' (no scene) or a Scene.id. */
-  sceneId: string;
-  enabled: boolean;
-  /** Master ambient volume, 0..1. */
-  volume: number;
 }
 
 export interface ExamState {

@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Settings, Volume2, VolumeX, Sparkles, Target, Bell, User, Cloud, HardDrive, Play, Key, RotateCcw } from 'lucide-react';
+import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key, RotateCcw } from 'lucide-react';
 import { UserSettings, DailyTarget, DailyStats, UserAuth, WeeklyInsightsData } from '../types';
 import { SOUND_NAMES, playSound } from '../lib/audio';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
 import { AiWeeklyInsightCard } from './AiWeeklyInsightCard';
-import { SceneGallery } from './SceneGallery';
-import { useAmbience } from '../context/AmbienceContext';
 import { RollingNumber } from '@kitlangton/rolling-number/react';
 
 interface SettingsStatsProps {
@@ -42,7 +40,6 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
   onDisconnectSyncCode
 }) => {
   const notifStatus = getNotificationPermissionStatus();
-  const { enabled, volume, toggleEnabled, setVolume } = useAmbience();
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinError, setJoinError] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
@@ -523,60 +520,6 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
                 />
               </label>
             </div>
-          </div>
-        </section>
-
-        {/* Ambience / Scenes */}
-        <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-zinc-400" />
-              <h2 className="font-semibold text-zinc-200">Ambience &amp; Scenes</h2>
-            </div>
-            <button
-              type="button"
-              onClick={toggleEnabled}
-              aria-pressed={enabled}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                enabled
-                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                  : 'bg-zinc-800 text-zinc-400'
-              }`}
-            >
-              {enabled ? 'On' : 'Off'}
-            </button>
-          </div>
-
-          <p className="text-xs text-zinc-400">
-            Pick a calming background and let a matching ambient sound play while you focus.
-          </p>
-
-          <div className={enabled ? '' : 'opacity-50 pointer-events-none'}>
-            <div className="mb-3">
-              <div className="flex justify-between text-zinc-400 mb-1">
-                <span className="flex items-center gap-1">
-                  {volume === 0 ? (
-                    <VolumeX className="h-3.5 w-3.5" />
-                  ) : (
-                    <Volume2 className="h-3.5 w-3.5" />
-                  )}
-                  Ambient Volume
-                </span>
-                <span>{Math.round(volume * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                className="w-full accent-zinc-400"
-                aria-label="Ambient volume"
-              />
-            </div>
-
-            <SceneGallery />
           </div>
         </section>
       </div>

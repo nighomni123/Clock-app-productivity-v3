@@ -13,9 +13,6 @@ import { TaskQueue } from './components/TaskQueue';
 import { SettingsStats } from './components/SettingsStats';
 import { AuthModal } from './components/AuthModal';
 import { ActivityJournal } from './components/ActivityJournal';
-import { AmbienceProvider } from './context/AmbienceContext';
-import { SceneBackground } from './components/SceneBackground';
-import { InfiniteShaderBackground } from './components/InfiniteShaderBackground';
 import {
   UserSettings,
   ExamState,
@@ -58,8 +55,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   enableNotifications: true,
   notificationLeadMinutes: 5,
   strictMode: false,
-  clockAnimation: 'roll',
-  ambience: { sceneId: 'none', enabled: false, volume: 0.15 }
+  clockAnimation: 'roll'
 };
 
 const DEFAULT_DAILY_TARGET: DailyTarget = {
@@ -271,8 +267,6 @@ export default function App() {
   useEffect(() => {
     if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.notes, notes);
   }, [notes, isLocalOnlyMode]);
-
-  const [shaderMode, setShaderMode] = useState<'fbm' | 'phyllotaxis'>('fbm');
 
   // Sync User Document & Settings from Firestore (Visibility-Aware)
   useEffect(() => {
@@ -1083,12 +1077,7 @@ export default function App() {
   }, [activityLogs, tasks, distractions, dailyTarget.minutes]);
 
   return (
-    <AmbienceProvider settings={settings} onUpdateSettings={handleUpdateSettings}>
-      <div className="min-h-screen flex flex-col bg-transparent text-zinc-100 font-sans selection:bg-zinc-800">
-        {/* Themed background for the whole app (renders nothing when ambience is off) */}
-        <InfiniteShaderBackground mode={shaderMode} />
-        <SceneBackground variant="app" />
-
+      <div className="min-h-screen flex flex-col bg-black text-zinc-100 font-sans selection:bg-zinc-800">
         {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -1191,15 +1180,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Visible shader-mode toggle for background options */}
-      <button
-        onClick={() => setShaderMode((m) => (m === 'fbm' ? 'phyllotaxis' : 'fbm'))}
-        className="fixed bottom-4 right-4 z-50 px-3 py-1.5 text-xs font-medium bg-black/60 text-zinc-300 border border-zinc-700/40 rounded-full hover:bg-black/80 hover:text-white transition-colors backdrop-blur-sm shadow-lg"
-        aria-label="Toggle shader background mode"
-      >
-        {shaderMode === 'fbm' ? 'Shader: fBm' : 'Shader: Sunflower'}
-      </button>
-
       {/* Account & Cross Device Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -1210,7 +1190,6 @@ export default function App() {
       {/* Vercel Web Analytics */}
       <Analytics />
       <SpeedInsights />
-      </div>
-    </AmbienceProvider>
+    </div>
   );
 }
