@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focus-clock-v4';
+const CACHE_NAME = 'focus-clock-v7';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -6,9 +6,19 @@ const ASSETS_TO_CACHE = [
   // Focus-backdrop ambient loops. Precached so a focus session has audio even
   // before the files have ever been played on this device; they are also picked
   // up by the stale-while-revalidate handler below on first playback.
+  //
+  // Deliberately *not* listed: /themes/audio/seaside_waves.ogg (2.8 MB). Precaching
+  // it would add that to every install for one backdrop, so it caches on first
+  // play instead and is offline from then on. The lazily-loaded p5 chunk has a
+  // build-time hash and cannot be named here; it is cached the same way.
   '/themes/audio/music_ambient_drift.ogg',
   '/themes/audio/forest_ambience.mp3',
-  '/themes/audio/music_midnight.ogg'
+  '/themes/audio/music_midnight.ogg',
+  '/themes/audio/music_lofi.mp3',
+  '/themes/audio/music_deep_focus.ogg',
+  '/themes/audio/library_fireplace.ogg',
+  '/themes/audio/rain_window.m4a',
+  '/themes/audio/snowfall_wind.m4a'
 ];
 
 self.addEventListener('install', (event) => {

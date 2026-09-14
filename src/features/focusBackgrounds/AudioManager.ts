@@ -180,7 +180,10 @@ export const playAmbient = (track: AmbientTrack, volume: number, fadeMs = FADE_M
   const target = clamp01(volume);
   detachGestureRetry();
 
-  const sameTrack = active && active.key === track.key && active.src === track.src;
+  // Match on the *file*, not the backdrop: two backdrops can share one loop, and
+  // fading the outgoing voice out and immediately back in would let its "settle"
+  // timer pause the very voice we just chose to keep playing.
+  const sameTrack = Boolean(active) && active.src === track.src;
   if (sameTrack) {
     const voice = voices.get(track.src);
     if (voice && !voice.el.paused) {
@@ -188,7 +191,7 @@ export const playAmbient = (track: AmbientTrack, volume: number, fadeMs = FADE_M
       rampTo(voice, target, Math.min(fadeMs, 400));
       return;
     }
-    // Same key but the element stalled/ended (e.g. iOS suspended it): resume it
+    // Same file but the element stalled/ended (e.g. iOS suspended it): resume it
     // in place rather than rebuilding a voice.
     if (voice) {
       voice.el.volume = 0;

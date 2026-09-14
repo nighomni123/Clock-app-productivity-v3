@@ -1,18 +1,43 @@
 # Focus-backdrop ambient loops
 
 Seamless looping audio paired with the selectable backdrops in
-`src/features/focusBackgrounds/backgroundConfig.ts`. Every file here is **CC0
-(public domain)**, so no attribution is required in the app UI — the entries
-below are provenance only, in case a loop is ever swapped out.
+`src/features/focusBackgrounds/backgroundConfig.ts`.
+
+## CC0 — public domain, no attribution required
 
 | File | Title — Author | License | Source |
 | --- | --- | --- | --- |
 | `music_ambient_drift.ogg` | Heavenly Loop — isaiah658 | CC0 1.0 | https://opengameart.org/content/heavenly-loop |
 | `forest_ambience.mp3` | Forest Ambience — TinyWorlds | CC0 1.0 | https://opengameart.org/content/forest-ambience |
 | `music_midnight.ogg` | Project Utopia (seamless loop) — Cong Xu (congusbongus) | CC0 1.0 | https://opengameart.org/content/project-utopia-seamless-loop |
+| `music_lofi.mp3` | Calm Loop — wipics | CC0 1.0 | https://opengameart.org/content/calm-loop |
+| `music_deep_focus.ogg` | Ambient Relaxing Loop — isaiah658 | CC0 1.0 | https://opengameart.org/content/ambient-relaxing-loop |
+| `rain_window.m4a` | Rain on Window Loop — OpenGameArt uploader | CC0 1.0 | https://opengameart.org/content/rain-on-window-loop |
+| `snowfall_wind.m4a` | wind1 — Luke.RUSTLTD | CC0 1.0 | https://opengameart.org/content/wind1 |
 
-These same paths are listed in `ASSETS_TO_CACHE` in `public/sw.js`, so each loop
-is precached and keeps working offline after the first load.
+`rain_window.m4a` and `snowfall_wind.m4a` were transcoded from the original
+`.wav` files with `afconvert -f m4af -d aac -b 64000` (mono, ~5× smaller; loop
+points unchanged). Two backdrops intentionally share a loop where the mood fits
+(Nocturne Bloom / Ink Garden, Minimal Flowers / Terracotta Field) — the audio
+engine matches on file, so switching between them never restarts the track.
+
+## CC BY — attribution required (surfaced in the picker footer)
+
+| File | Title — Author | License | Source |
+| --- | --- | --- | --- |
+| `seaside_waves.ogg` | Oceanwavescrushing — Luftrum | CC BY 3.0 | https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg |
+| `library_fireplace.ogg` | Fire of the forge crackling — Work With Sounds / La Fonderie | CC BY 4.0 | https://commons.wikimedia.org/wiki/File:WWS_Fireoftheforge.ogg |
+
+The credit text for these two is rendered under the backdrop picker in
+`Settings & Stats` (`BackgroundPicker.tsx`). If a CC-BY file is removed, drop its
+credit there too.
+
+## Offline
+
+Most of these paths are listed in `ASSETS_TO_CACHE` in `public/sw.js` and are
+therefore precached. `seaside_waves.ogg` is deliberately **not** precached (2.8 MB
+for one backdrop); the service worker's stale-while-revalidate handler caches it
+on first playback, so it works offline from then on.
 
 ## Adding a loop
 

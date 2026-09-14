@@ -21,7 +21,13 @@ import type { CanvasSize, FocusSketch } from '../backgroundConfig';
 type RGB = [number, number, number];
 
 /** Named colourways. Restrained by design: one paper, one ink, 3–4 accents. */
-export type FlowerPaletteName = 'warm' | 'sage' | 'nocturne';
+export type FlowerPaletteName =
+  | 'warm'
+  | 'sage'
+  | 'nocturne'
+  | 'blush'
+  | 'ink'
+  | 'terracotta';
 
 interface FlowerPalette {
   /** Canvas ground (the "paper"). */
@@ -77,6 +83,47 @@ const PALETTES: Record<FlowerPaletteName, FlowerPalette> = {
     ],
     grain: [216, 220, 226],
     vignette: 0.22,
+  },
+  blush: {
+    paper: [246, 235, 234],
+    ink: [92, 70, 70],
+    leaf: [170, 152, 146],
+    petals: [
+      [214, 150, 150],
+      [232, 190, 182],
+      [176, 140, 158],
+      [240, 226, 210],
+    ],
+    grain: [118, 90, 88],
+    vignette: 0.1,
+  },
+  ink: {
+    paper: [38, 42, 48],
+    ink: [204, 210, 214],
+    leaf: [136, 158, 150],
+    petals: [
+      [196, 208, 196],
+      [226, 228, 226],
+      [150, 166, 186],
+      [214, 204, 184],
+    ],
+    grain: [214, 220, 226],
+    vignette: 0.26,
+  },
+  terracotta: {
+    // Pushed from orange-red toward ochre/rust: the first pass was the loudest
+    // tile in the picker and looked airbrushed rather than earthy.
+    paper: [235, 216, 196],
+    ink: [92, 62, 46],
+    leaf: [148, 122, 92],
+    petals: [
+      [198, 110, 78],
+      [209, 149, 84],
+      [146, 84, 66],
+      [231, 211, 180],
+    ],
+    grain: [118, 90, 68],
+    vignette: 0.11,
   },
 };
 

@@ -48,6 +48,14 @@ const formatClock = (milliseconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
+/**
+ * Small captions need their own plate while artwork is live: the scrim is tuned
+ * for the 120px digits, so 10–11px zinc-500 text measures ~1.4:1 on the lighter
+ * backdrops. Mirrors the pill treatment the exit-fullscreen control already uses.
+ */
+const BACKDROP_CHIP =
+  'rounded-full bg-black/60 px-2.5 py-1 text-zinc-100 ring-1 ring-white/10 backdrop-blur-sm';
+
 export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   settings,
   intention,
@@ -85,6 +93,9 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const backdropOption = focusBackground?.option ?? null;
   const hasBackdrop = Boolean(backdropOption);
   const focusBackdropActive = mode === 'focus' && (isRunning || focusFullscreen);
+
+  /** Artwork is on screen right now — the only time small text needs a plate. */
+  const onArtwork = focusBackdropActive && hasBackdrop;
 
   const endTimeRef = useRef(0);
   const completionLockRef = useRef(false);
@@ -417,10 +428,21 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
         <div className="relative z-20 flex w-full max-w-6xl items-center justify-between gap-1.5 sm:gap-2 shrink-0 py-0.5">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.15em] sm:tracking-[0.25em] text-zinc-400">
+            <span
+              className={`text-[10px] sm:text-xs font-semibold uppercase tracking-[0.15em] sm:tracking-[0.25em] ${
+                // 10px zinc-400 over live artwork measures ~1.4:1. The scrim is
+                // tuned for the digits, so the small labels get the same plate
+                // treatment the exit-fullscreen pill already uses.
+                onArtwork
+                  ? BACKDROP_CHIP
+                  : 'text-zinc-400'
+              }`}
+            >
               {activeLabel}
             </span>
-            <span className="text-[10px] sm:text-xs text-zinc-600 font-mono">({Math.round(progress)}%)</span>
+            <span className={`text-[10px] sm:text-xs font-mono ${onArtwork ? 'text-zinc-300' : 'text-zinc-600'}`}>
+              ({Math.round(progress)}%)
+            </span>
           </div>
 
           <div className="flex rounded-full border border-zinc-800/80 bg-zinc-900/90 p-0.5 backdrop-blur-md">
@@ -518,13 +540,23 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
             <div className="px-2 max-w-md sm:max-w-xl text-center">
               {intention ? (
                 <>
-                  <p className="text-[8px] sm:text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500 mb-0.5">Session Goal</p>
+                  <p
+                    className={`mb-0.5 text-[8px] sm:text-[10px] font-medium uppercase tracking-[0.2em] ${
+                      onArtwork
+                        ? BACKDROP_CHIP
+                        : 'text-zinc-500'
+                    }`}
+                  >
+                    Session Goal
+                  </p>
                   <h2 className="text-xs sm:text-base md:text-lg font-light text-zinc-100 leading-snug line-clamp-1">
                     {intention}
                   </h2>
                 </>
               ) : (
-                <p className="text-[10px] sm:text-xs text-zinc-600 italic">No goal set for this session</p>
+                <p className={`text-[10px] sm:text-xs italic ${onArtwork ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                  No goal set for this session
+                </p>
               )}
             </div>
 
@@ -631,11 +663,19 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
         )}
 
         {/* Bottom Shortcut Hints */}
-        <div className="relative z-20 flex flex-wrap justify-center gap-1.5 sm:gap-3 text-[9px] sm:text-[11px] text-zinc-500 shrink-0 py-0.5">
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">Space: Play/Pause</span>
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">R: Reset</span>
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">D: Distraction</span>
-          <span className="rounded-full border border-zinc-800/80 bg-zinc-900/60 px-2 py-0.5 sm:px-3 sm:py-1">ESC or F: Exit</span>
+        <div className="relative z-20 flex flex-wrap justify-center gap-1.5 sm:gap-3 text-[9px] sm:text-[11px] shrink-0 py-0.5">
+          {['Space: Play/Pause', 'R: Reset', 'D: Distraction', 'ESC or F: Exit'].map((hint) => (
+            <span
+              key={hint}
+              className={`rounded-full border px-2 py-0.5 sm:px-3 sm:py-1 ${
+                onArtwork
+                  ? 'border-white/10 bg-black/65 text-zinc-100 backdrop-blur-sm'
+                  : 'border-zinc-800/80 bg-zinc-900/60 text-zinc-500'
+              }`}
+            >
+              {hint}
+            </span>
+          ))}
         </div>
       </div>
     );
@@ -699,7 +739,13 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
               ))}
             </div>
 
-            <p className="mb-2 text-xs font-medium uppercase tracking-[0.3em] text-zinc-500">{activeLabel}</p>
+            <p
+              className={`mb-2 text-xs font-medium uppercase tracking-[0.3em] ${
+                onArtwork ? BACKDROP_CHIP : 'text-zinc-500'
+              }`}
+            >
+              {activeLabel}
+            </p>
 
             {/* Display Clock */}
             <div
@@ -719,7 +765,13 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
             <div className="mt-6 min-h-[50px] text-center max-w-xl">
               {intention ? (
                 <>
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Session Goal</p>
+                  <p
+                className={`text-[10px] uppercase tracking-[0.25em] ${
+                  onArtwork ? BACKDROP_CHIP : 'text-zinc-500'
+                }`}
+              >
+                Session Goal
+              </p>
                   <p className={`mt-1 font-light text-zinc-200 ${focusFullscreen ? 'text-2xl md:text-3xl' : 'text-lg'}`}>
                     {intention}
                   </p>
@@ -758,12 +810,24 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
             </div>
 
             {/* Keyboard Shortcuts Footer */}
-            <div className="mt-8 flex flex-wrap justify-center gap-2 text-[11px] text-zinc-600">
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">Space: Play/Pause</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">R: Reset</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">D: Distraction</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">N: Quick Notes</span>
-              <span className="rounded-full border border-zinc-800/60 bg-black/30 px-2.5 py-1">F: Fullscreen</span>
+            <div className={`mt-8 flex flex-wrap justify-center gap-2 text-[11px] ${
+                onArtwork ? 'text-zinc-100' : 'text-zinc-600'
+              }`}>
+              <span className={`rounded-full border ${
+                onArtwork ? 'border-white/10 bg-black/70' : 'border-zinc-800/60 bg-black/30'
+              } px-2.5 py-1`}>Space: Play/Pause</span>
+              <span className={`rounded-full border ${
+                onArtwork ? 'border-white/10 bg-black/70' : 'border-zinc-800/60 bg-black/30'
+              } px-2.5 py-1`}>R: Reset</span>
+              <span className={`rounded-full border ${
+                onArtwork ? 'border-white/10 bg-black/70' : 'border-zinc-800/60 bg-black/30'
+              } px-2.5 py-1`}>D: Distraction</span>
+              <span className={`rounded-full border ${
+                onArtwork ? 'border-white/10 bg-black/70' : 'border-zinc-800/60 bg-black/30'
+              } px-2.5 py-1`}>N: Quick Notes</span>
+              <span className={`rounded-full border ${
+                onArtwork ? 'border-white/10 bg-black/70' : 'border-zinc-800/60 bg-black/30'
+              } px-2.5 py-1`}>F: Fullscreen</span>
             </div>
           </div>
         </div>

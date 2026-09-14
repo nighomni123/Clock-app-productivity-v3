@@ -210,6 +210,7 @@ export const BackgroundCanvas: React.FC<BackgroundCanvasProps> = ({
   return (
     <div
       aria-hidden="true"
+      data-focus-canvas-host=""
       className={`pointer-events-none overflow-hidden ${className}`}
     >
       <div ref={layerRef} className="absolute inset-0" />

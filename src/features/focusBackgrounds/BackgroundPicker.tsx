@@ -9,7 +9,7 @@
  * never reflows or flashes.
  */
 import React, { useEffect, useState } from 'react';
-import { Check, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { Check, Sparkles, Volume2, VolumeX, Wind } from 'lucide-react';
 import {
   FOCUS_BACKGROUND_OPTIONS,
   NONE_BACKGROUND_ID,
@@ -25,17 +25,37 @@ interface Tile {
   label: string;
   mood: string;
   swatch: string;
+  /** True for the scenes that drift; shown as a small badge on the tile. */
+  animated: boolean;
+  crop?: string;
 }
 
-const buildTiles = (): Tile[] => [
-  { id: NONE_BACKGROUND_ID, label: 'No Backdrop', mood: 'Plain dark mode', swatch: NONE_SWATCH },
-  ...FOCUS_BACKGROUND_OPTIONS.map((option: FocusBackgroundOption) => ({
-    id: option.id,
-    label: option.label,
-    mood: option.mood,
-    swatch: option.swatch,
-  })),
-];
+const buildTiles = (selectedId?: string): Tile[] => {
+  const tiles: Tile[] = [
+    {
+      id: NONE_BACKGROUND_ID,
+      label: 'No Backdrop',
+      mood: 'Plain dark mode',
+      swatch: NONE_SWATCH,
+      animated: false,
+    },
+    ...FOCUS_BACKGROUND_OPTIONS.map((option: FocusBackgroundOption) => ({
+      id: option.id,
+      label: option.label,
+      mood: option.mood,
+      swatch: option.swatch,
+      animated: Boolean(option.animated),
+      crop: option.thumbCrop,
+    })),
+  ];
+  // The popover shows every option at once, so put the one in use at the top
+  // instead of making the user hunt for it in a twelve-item grid.
+  if (selectedId && selectedId !== tiles[0].id) {
+    const index = tiles.findIndex((tile) => tile.id === selectedId);
+    if (index > 0) tiles.unshift(...tiles.splice(index, 1));
+  }
+  return tiles;
+};
 
 interface BackgroundPickerProps {
   controller: FocusBackgroundController;
@@ -48,7 +68,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
   compact = false,
 }) => {
   const [thumbs, setThumbs] = useState<ThumbnailMap>({});
-  const tiles = buildTiles();
+  const tiles = buildTiles(compact ? controller.id : undefined);
   const selectedOption = controller.option;
   const selectedLabel =
     tiles.find((tile) => tile.id === controller.id)?.label ?? 'No Backdrop';
@@ -80,34 +100,46 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
   if (compact) {
     return (
       <div className="space-y-2">
-        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Focus backdrops">
-          {tiles.map((tile) => {
-            const selected = tile.id === controller.id;
-            const image = tileImage(tile);
-            return (
-              <button
-                key={tile.id}
-                type="button"
-                onClick={() => pick(tile.id)}
-                aria-pressed={selected}
-                aria-label={tile.label}
-                title={tile.label}
-                className={`min-h-[44px] rounded-2xl border p-1 text-left transition ${
-                  selected
-                    ? 'border-zinc-300 ring-2 ring-zinc-400/60'
-                    : 'border-zinc-800/80 hover:border-zinc-600'
-                }`}
-              >
-                <span
-                  className="block h-11 w-full rounded-xl bg-cover bg-[center_72%]"
-                  style={image ? { backgroundImage: `url("${image}")` } : { backgroundImage: tile.swatch }}
-                />
-                <span className="mt-1 block px-0.5 pb-0.5 text-[10px] leading-tight text-zinc-300">
-                  {tile.label}
-                </span>
-              </button>
-            );
-          })}
+        <div
+          className="max-h-[42vh] overflow-y-auto no-scrollbar"
+          role="group"
+          aria-label="Focus backdrops"
+        >
+          <div className="space-y-1">
+            {tiles.map((tile) => {
+              const selected = tile.id === controller.id;
+              const image = tileImage(tile);
+              return (
+                <button
+                  key={tile.id}
+                  type="button"
+                  onClick={() => pick(tile.id)}
+                  aria-pressed={selected}
+                  aria-label={tile.animated ? `${tile.label}, gentle motion` : tile.label}
+                  title={tile.mood}
+                  className={`flex min-h-[44px] w-full items-center gap-2 rounded-xl border p-1.5 text-left transition ${
+                    selected
+                      ? 'border-zinc-300 bg-zinc-800/50 ring-1 ring-zinc-400/60'
+                      : 'border-zinc-800/80 hover:border-zinc-600'
+                  }`}
+                >
+                  <span
+                    className="h-10 w-16 shrink-0 rounded-lg bg-cover bg-[center_72%]"
+                    style={
+                  image
+                    ? { backgroundImage: `url("${image}")`, backgroundPosition: tile.crop }
+                    : { backgroundImage: tile.swatch }
+                }
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-200">
+                    {tile.label}
+                  </span>
+                  {tile.animated && <Wind className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />}
+                  {selected && <Check className="h-3.5 w-3.5 shrink-0 text-zinc-200" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <AudioControls controller={controller} selectedLabel={selectedLabel} selectedOption={selectedOption} />
       </div>
@@ -126,6 +158,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
               type="button"
               onClick={() => pick(tile.id)}
               aria-pressed={selected}
+              aria-label={tile.animated ? `${tile.label}, gentle motion` : tile.label}
               className={`group relative overflow-hidden rounded-3xl border p-2 text-left min-h-[44px] transition ${
                 selected
                   ? 'border-zinc-300 ring-2 ring-zinc-400/50'
@@ -134,8 +167,21 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
             >
               <span
                 className="block h-20 w-full rounded-2xl bg-cover bg-[center_72%]"
-                style={image ? { backgroundImage: `url("${image}")` } : { backgroundImage: tile.swatch }}
+                style={
+                  image
+                    ? { backgroundImage: `url("${image}")`, backgroundPosition: tile.crop }
+                    : { backgroundImage: tile.swatch }
+                }
               />
+              {tile.animated && (
+                <span
+                  className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200 backdrop-blur-sm"
+                  title="This backdrop drifts slowly"
+                >
+                  <Wind className="h-2.5 w-2.5" aria-hidden />
+                  Motion
+                </span>
+              )}
               <span className="mt-2 block px-1 pb-1">
                 <span className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium text-zinc-100">{tile.label}</span>
@@ -148,6 +194,30 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
         })}
       </div>
       <AudioControls controller={controller} selectedLabel={selectedLabel} selectedOption={selectedOption} />
+
+      {/* CC-BY loops require a visible credit. Full provenance lives in
+          public/themes/audio/README.md. */}
+      <p className="text-[11px] leading-relaxed text-zinc-600">
+        Ambient loops are CC0 except: “Oceanwavescrushing” by{' '}
+        <a
+          href="https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400"
+        >
+          Luftrum
+        </a>
+        , and “Fire of the forge” by{' '}
+        <a
+          href="https://commons.wikimedia.org/wiki/File:WWS_Fireoftheforge.ogg"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400"
+        >
+          Work With Sounds
+        </a>
+        (CC BY). Artwork is generated in your browser from a fixed seed.
+      </p>
     </div>
   );
 };
