@@ -198,7 +198,8 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
       {/* CC-BY loops require a visible credit. Full provenance lives in
           public/themes/audio/README.md. */}
       <p className="text-[11px] leading-relaxed text-zinc-600">
-        Ambient loops are CC0 except: “Oceanwavescrushing” by{' '}
+        Ambient &amp; music loops are CC0/public-domain except: “Oceanwavescrushing”
+        by{' '}
         <a
           href="https://commons.wikimedia.org/wiki/File:Oceanwavescrushing.ogg"
           target="_blank"
@@ -207,7 +208,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
         >
           Luftrum
         </a>
-        , and “Fire of the forge” by{' '}
+        , “Fire of the forge” by{' '}
         <a
           href="https://commons.wikimedia.org/wiki/File:WWS_Fireoftheforge.ogg"
           target="_blank"
@@ -215,6 +216,24 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
           className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400"
         >
           Work With Sounds
+        </a>
+        , “calm bgm” by{' '}
+        <a
+          href="https://opengameart.org/content/calm-bgm"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400"
+        >
+          syncopika
+        </a>
+        , and “The Long Dark” by{' '}
+        <a
+          href="https://commons.wikimedia.org/wiki/File:Scott_Buckley_%E2%80%93_The_Long_Dark_%28Ambient_Neoclassical_Piano%29.ogg"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400"
+        >
+          Scott Buckley
         </a>
         (CC BY). Artwork is generated in your browser from a fixed seed.
       </p>
