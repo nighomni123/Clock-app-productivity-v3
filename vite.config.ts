@@ -55,8 +55,11 @@ export default defineConfig(() => {
       },
       // Firebase's Firestore SDK alone approaches ~760 kB minified (~191 kB
       // gzipped, cached as its own chunk); the ceiling stays meaningful for
-      // catching real regressions while tolerating known-vendor weight.
-      chunkSizeWarningLimit: 800,
+      // catching real regressions while tolerating known-vendor weight. It sits
+      // just above the lazily-loaded p5 chunk (~1.07 MB, fetched only when a
+      // focus backdrop or the backdrop picker is first opened) so that expected
+      // vendor weight — and the xlsx lazy chunk — don't drown out real warnings.
+      chunkSizeWarningLimit: 1100,
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key, RotateCcw } from 'lucide-react';
+import { Settings, Volume2, Target, Bell, User, Cloud, HardDrive, Play, Key, RotateCcw, Palette } from 'lucide-react';
 import { UserSettings, DailyTarget, DailyStats, UserAuth, WeeklyInsightsData } from '../types';
 import { SOUND_NAMES, playSound } from '../lib/audio';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../lib/notifications';
 import { AiWeeklyInsightCard } from './AiWeeklyInsightCard';
+import { BackgroundPicker } from '../features/focusBackgrounds/BackgroundPicker';
+import type { FocusBackgroundController } from '../features/focusBackgrounds/useFocusBackground';
 import { RollingNumber } from '@kitlangton/rolling-number/react';
 
 interface SettingsStatsProps {
   settings: UserSettings;
   onUpdateSettings: (settings: UserSettings) => void;
+  /** Selected focus backdrop + controller (owned by App). Optional by design. */
+  focusBackground?: FocusBackgroundController;
   dailyTarget: DailyTarget;
   onUpdateDailyTarget: (target: DailyTarget) => void;
   onResetDailyProgress: () => void;
@@ -26,6 +30,7 @@ interface SettingsStatsProps {
 export const SettingsStats: React.FC<SettingsStatsProps> = ({
   settings,
   onUpdateSettings,
+  focusBackground,
   dailyTarget,
   onUpdateDailyTarget,
   onResetDailyProgress,
@@ -522,6 +527,35 @@ export const SettingsStats: React.FC<SettingsStatsProps> = ({
             </div>
           </div>
         </section>
+
+        {/* Focus Backdrops: artwork + the ambient loop paired with it */}
+        {focusBackground && (
+          <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/55 p-6 backdrop-blur-sm space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Palette className="h-4 w-4 text-zinc-400" />
+                <h2 className="font-semibold text-zinc-200">Focus Backdrops</h2>
+              </div>
+              <span
+                className={`rounded-full px-3 py-1 text-[11px] font-medium border ${
+                  focusBackground.option
+                    ? 'border-emerald-800 bg-emerald-950 text-emerald-300'
+                    : 'border-zinc-700/60 bg-zinc-800 text-zinc-400'
+                }`}
+              >
+                {focusBackground.option ? 'On' : 'Off'}
+              </span>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Choose the artwork shown behind the timer while you focus. Each backdrop fades in its
+              own soft ambient loop when a focus block starts and fades out when it ends.
+              {syncCode ? ' Saved with sync code ' + syncCode + '.' : ' Saved to this device until you pair a sync code.'}
+            </p>
+
+            <BackgroundPicker controller={focusBackground} />
+          </section>
+        )}
       </div>
 
       {/* Offline PWA & Storage Details */}

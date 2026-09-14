@@ -1,14 +1,22 @@
-const CACHE_NAME = 'focus-clock-v3';
+const CACHE_NAME = 'focus-clock-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  // Focus-backdrop ambient loops. Precached so a focus session has audio even
+  // before the files have ever been played on this device; they are also picked
+  // up by the stale-while-revalidate handler below on first playback.
+  '/themes/audio/music_ambient_drift.ogg',
+  '/themes/audio/forest_ambience.mp3',
+  '/themes/audio/music_midnight.ogg'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
+      // allSettled (not addAll) so one missing optional asset cannot silently
+      // drop the entire precache list.
+      return Promise.allSettled(ASSETS_TO_CACHE.map((url) => cache.add(url)));
     })
   );
   self.skipWaiting();
@@ -52,6 +60,15 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match('/'))
     );
+    return;
+  }
+
+  // Media elements (the focus-backdrop ambient loops) issue Range requests.
+  // Answer those straight from the network so a partial 206 is never written to
+  // the cache under the full-file key; offline, the precached 200 copy is
+  // served instead, which satisfies the requested byte range.
+  if (request.headers.get('range')) {
+    event.respondWith(fetch(request).catch(() => caches.match(request.url)));
     return;
   }
 

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, AlertTriangle, Maximize2, Minimize2, FileText, Check, Trash2, Plus, ListFilter } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Play, Pause, RotateCcw, AlertTriangle, Maximize2, Minimize2, FileText, Check, Trash2, Plus, ListFilter, Palette } from 'lucide-react';
 import { UserSettings, TaskItem, DistractionItem } from '../types';
 import RollingClock from './RollingClock';
 import { playSound } from '../lib/audio';
 import { sendNotification } from '../lib/notifications';
+import { BackgroundCanvas } from '../features/focusBackgrounds/BackgroundCanvas';
+import { BackgroundPicker } from '../features/focusBackgrounds/BackgroundPicker';
+import type { FocusBackgroundController } from '../features/focusBackgrounds/useFocusBackground';
 
 interface FocusWorkspaceProps {
   settings: UserSettings;
@@ -23,6 +27,14 @@ interface FocusWorkspaceProps {
   // New props for journal integration
   onStartSessionLog?: (startTime: number, title?: string) => Promise<string | undefined | void>;
   onUpdateSessionLog?: (id: string | undefined | null, endTime: number) => Promise<void> | void;
+  /**
+   * Selected focus backdrop + its controller (owned by App so the Settings
+   * picker and this view share one selection). Optional so the component stays
+   * usable without the feature.
+   */
+  focusBackground?: FocusBackgroundController;
+  /** Reports whether the backdrop/ambient window is open (focus running or fullscreen focus). */
+  onFocusActiveChange?: (active: boolean) => void;
 }
 
 const formatClock = (milliseconds: number): string => {
@@ -52,7 +64,9 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   onLogDistraction,
   onLogCompletedSession,
   onStartSessionLog,
-  onUpdateSessionLog
+  onUpdateSessionLog,
+  focusBackground,
+  onFocusActiveChange
 }) => {
   const [mode, setMode] = useState<'focus' | 'break' | 'longBreak'>('focus');
   const [isRunning, setIsRunning] = useState(false);
@@ -64,6 +78,13 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   const [focusFullscreen, setFocusFullscreen] = useState(false);
   const [showFsDistractionModal, setShowFsDistractionModal] = useState(false);
   const [fsDistractionInput, setFsDistractionInput] = useState('');
+  const [showBackgroundSwitcher, setShowBackgroundSwitcher] = useState(false);
+
+  // Focus mode is "live" while a focus block is counting down *or* while the
+  // fullscreen focus view is open (so the artwork frames the view before Play).
+  const backdropOption = focusBackground?.option ?? null;
+  const hasBackdrop = Boolean(backdropOption);
+  const focusBackdropActive = mode === 'focus' && (isRunning || focusFullscreen);
 
   const endTimeRef = useRef(0);
   const completionLockRef = useRef(false);
@@ -85,6 +106,14 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   // countdown is decreasing, up when it jumps (reset / mode switch / start).
   const prevClockTimeRef = useRef(timeLeft);
   useEffect(() => { prevClockTimeRef.current = timeLeft; });
+
+  // Tell App when the backdrop window opens/closes so ambient audio starts and
+  // stops with focus mode. The cleanup also covers unmount (switching tabs
+  // unmounts this view and ends the timer), reporting `false` either way.
+  useEffect(() => {
+    onFocusActiveChange?.(focusBackdropActive);
+    return () => onFocusActiveChange?.(false);
+  }, [focusBackdropActive, onFocusActiveChange]);
 
   // Open a journal segment (Work entry) for a running focus block. The entry starts
   // now and its endTime is updated to the real stop moment, so it always reflects
@@ -371,6 +400,13 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
   if (focusFullscreen) {
     return (
       <div className="fixed inset-0 z-[9999] h-screen w-screen flex flex-col items-center justify-between bg-zinc-950 p-2 sm:p-4 md:p-6 text-zinc-100 select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        {/* Focus backdrop artwork (behind every element in this view; renders
+            only while focus mode is live — a running focus block or an open
+            fullscreen focus view — and never during a break) */}
+        {focusBackdropActive && hasBackdrop && (
+          <BackgroundCanvas option={backdropOption} className="absolute inset-0 z-0" />
+        )}
+
         {/* Ambient Progress Fill */}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 bg-zinc-900/50 transition-all duration-500 ease-linear"
@@ -418,6 +454,48 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
             <kbd className="hidden sm:inline-block rounded bg-zinc-800 px-1 py-0.5 text-[9px] text-zinc-400 border border-zinc-700/60">ESC</kbd>
           </button>
         </div>
+
+        {/* Backdrop quick-switcher (bottom-left, clear of the hint pills/Exit) */}
+        {focusBackground && (
+          <div className="absolute bottom-16 left-4 sm:bottom-6 sm:left-6 z-30 flex flex-col items-start gap-2">
+            <AnimatePresence>
+              {showBackgroundSwitcher && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.18 }}
+                  className="w-72 max-w-[78vw] rounded-3xl border border-zinc-800/80 bg-zinc-900/90 p-3 shadow-2xl backdrop-blur-md"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-200">
+                      <Palette className="h-3.5 w-3.5 text-zinc-400" /> Focus Backdrop
+                    </span>
+                    <span className="truncate text-[10px] text-zinc-500">
+                      {backdropOption?.label ?? 'No Backdrop'}
+                    </span>
+                  </div>
+                  <BackgroundPicker controller={focusBackground} compact />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button
+              id="fs-backdrop-switcher-btn"
+              type="button"
+              onClick={() => setShowBackgroundSwitcher((open) => !open)}
+              aria-expanded={showBackgroundSwitcher}
+              aria-label="Change focus backdrop"
+              className={`flex h-11 w-11 items-center justify-center rounded-full border backdrop-blur-md transition ${
+                showBackgroundSwitcher
+                  ? 'border-zinc-500 bg-zinc-800 text-white'
+                  : 'border-zinc-800/80 bg-zinc-900/80 text-zinc-300 hover:border-zinc-700 hover:text-white'
+              }`}
+            >
+              <Palette className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Strict Mode Alert Overlay */}
         {strictAlert && (
@@ -568,6 +646,11 @@ export const FocusWorkspace: React.FC<FocusWorkspaceProps> = ({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
         {/* Timer Canvas Panel */}
         <div className="relative flex flex-col items-center justify-center overflow-hidden min-h-[480px] rounded-3xl border border-zinc-800/80 bg-zinc-900/45 p-8 h-full backdrop-blur-sm">
+          {/* Focus backdrop artwork, framed inside the timer panel */}
+          {focusBackdropActive && hasBackdrop && (
+            <BackgroundCanvas option={backdropOption} className="absolute inset-0 z-0" />
+          )}
+
           {/* Strict Mode Alert Overlay */}
           {strictAlert && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">

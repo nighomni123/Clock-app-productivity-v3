@@ -12,6 +12,27 @@ export interface UserSettings {
   strictMode: boolean;
   /** Animation style for the focus/wall clock displays. */
   clockAnimation: 'roll' | 'static';
+  /**
+   * Focus-mode artwork backdrop and its paired ambient audio. Optional because
+   * persisted docs written before this feature exists simply lack it — always
+   * normalise on read (see `normaliseFocusBackground`).
+   */
+  focusBackground?: FocusBackgroundSettings;
+}
+
+/**
+ * Persisted selection for the focus-backdrop feature. Lives inside
+ * `UserSettings` so it inherits the app's existing persistence paths:
+ * the localStorage guest mirror and the `users/<uid>` /
+ * `sync_sessions/<CODE>` settings documents.
+ */
+export interface FocusBackgroundSettings {
+  /** `FocusBackgroundOption.id` from the registry, or `'none'`. */
+  id: string;
+  /** Whether the backdrop's ambient loop plays while focus mode is active. */
+  audioEnabled: boolean;
+  /** Ambient level, 0..1 (media element volume). */
+  volume: number;
 }
 
 export interface ExamState {

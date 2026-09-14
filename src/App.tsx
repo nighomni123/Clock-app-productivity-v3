@@ -13,6 +13,7 @@ import { TaskQueue } from './components/TaskQueue';
 import { SettingsStats } from './components/SettingsStats';
 import { AuthModal } from './components/AuthModal';
 import { ActivityJournal } from './components/ActivityJournal';
+import { useFocusBackground } from './features/focusBackgrounds/useFocusBackground';
 import {
   UserSettings,
   ExamState,
@@ -55,7 +56,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   enableNotifications: true,
   notificationLeadMinutes: 5,
   strictMode: false,
-  clockAnimation: 'roll'
+  clockAnimation: 'roll',
+  focusBackground: { id: 'none', audioEnabled: true, volume: 0.14 }
 };
 
 const DEFAULT_DAILY_TARGET: DailyTarget = {
@@ -140,6 +142,9 @@ export default function App() {
   const [isTabVisible, setIsTabVisible] = useState<boolean>(() => (typeof document !== 'undefined' ? !document.hidden : true));
   // Request payload that tells FocusWorkspace to auto-start a focus session on a given topic
   const [focusStartRequest, setFocusStartRequest] = useState<{ topic: string; ts: number } | null>(null);
+  // Focus mode is live (a focus block running, or fullscreen focus open).
+  // Reported by FocusWorkspace; drives the backdrop artwork + ambient audio.
+  const [focusBackdropActive, setFocusBackdropActive] = useState<boolean>(false);
 
   // Debounce timeout refs to reduce write frequency for text inputs
   const notesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -473,6 +478,16 @@ export default function App() {
     },
     [userAuth?.uid, syncCode]
   );
+
+  // Focus-mode artwork backdrop + paired ambient audio. Owned once here so the
+  // Settings picker, the focus view and the fullscreen quick-switcher all share
+  // a single selection; it persists through `handleUpdateSettings`, which means
+  // it rides the existing guest localStorage mirror and the 9-letter sync code.
+  const focusBackground = useFocusBackground({
+    settings,
+    onUpdateSettings: handleUpdateSettings,
+    active: focusBackdropActive,
+  });
 
   const handleUpdateDailyTarget = useCallback(
     async (newTarget: DailyTarget) => {
@@ -1117,6 +1132,8 @@ export default function App() {
             onRemoveTask={handleRemoveTask}
             onStartFocusForTask={handleStartFocusForTask}
             focusStartRequest={focusStartRequest}
+            focusBackground={focusBackground}
+            onFocusActiveChange={setFocusBackdropActive}
             notes={notes}
             onUpdateNotes={handleUpdateNotes}
             distractionLog={distractions}
@@ -1164,6 +1181,7 @@ export default function App() {
           <SettingsStats
             settings={settings}
             onUpdateSettings={handleUpdateSettings}
+            focusBackground={focusBackground}
             dailyTarget={dailyTarget}
             onUpdateDailyTarget={handleUpdateDailyTarget}
             onResetDailyProgress={handleResetDailyProgress}
