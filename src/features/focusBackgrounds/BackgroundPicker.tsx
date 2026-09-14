@@ -9,7 +9,7 @@
  * never reflows or flashes.
  */
 import React, { useEffect, useState } from 'react';
-import { Check, Sparkles, Volume2, VolumeX, Wind } from 'lucide-react';
+import { Check, Music, Sparkles, Volume2, VolumeX, Wind } from 'lucide-react';
 import {
   FOCUS_BACKGROUND_OPTIONS,
   NONE_BACKGROUND_ID,
@@ -229,6 +229,7 @@ const AudioControls: React.FC<{
   selectedOption: FocusBackgroundOption | null;
 }> = ({ controller, selectedLabel, selectedOption }) => {
   const hasAudio = Boolean(selectedOption?.audio);
+  const hasMusic = Boolean(selectedOption?.music);
   const percent = Math.round(controller.volume * 100);
 
   return (
@@ -287,6 +288,64 @@ const AudioControls: React.FC<{
           )}
         </div>
       )}
+
+      {/* Music layer — a melodic track layered under the ambient soundscape. */}
+      <div className="rounded-2xl border border-zinc-800/70 bg-black/30 p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-200">
+            <Music className="h-3.5 w-3.5 text-zinc-400" />
+            Music
+          </span>
+          <button
+            type="button"
+            onClick={controller.toggleMusic}
+            aria-pressed={controller.musicEnabled}
+            disabled={!hasMusic}
+            className={`rounded-full px-3 py-1 min-h-[28px] text-[11px] font-medium transition disabled:opacity-40 ${
+              controller.musicEnabled && hasMusic
+                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60'
+            }`}
+          >
+            {hasMusic ? (controller.musicEnabled ? 'On' : 'Off') : 'None'}
+          </button>
+        </div>
+
+        {!hasMusic ? (
+          <p className="text-[11px] text-zinc-500">
+            {selectedLabel} has no paired music. Pick a backdrop to hear its track.
+          </p>
+        ) : (
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-zinc-400">
+              <span className="flex items-center gap-1">
+                {controller.musicVolume === 0 || !controller.musicEnabled ? (
+                  <VolumeX className="h-3.5 w-3.5" />
+                ) : (
+                  <Volume2 className="h-3.5 w-3.5" />
+                )}
+                Music volume
+              </span>
+              <span className="tabular-nums">{Math.round(controller.musicVolume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={controller.musicVolume}
+              onChange={(event) => controller.setMusicVolume(Number(event.target.value))}
+              className="w-full accent-zinc-400"
+              aria-label="Music volume"
+            />
+            {!controller.active && (
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Plays automatically while a focus block is running.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

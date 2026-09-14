@@ -8,10 +8,10 @@
  * therefore scoped to that code), otherwise merged into `users/<uid>`. Nothing
  * in this hook re-implements storage or sync.
  *
- * Mount this hook **once** (in `App.tsx`) and pass the returned controller down
- * as a prop — mirroring how the rest of the app threads `settings` +
- * `onUpdateSettings`. It is the only bridge between React state and the
- * framework-free `AudioManager`.
+ * Each backdrop plays up to two layered, looping voices — an `ambient`
+ * soundscape and an optional `music` track — both managed by `AudioManager`.
+ * This hook is the only bridge between React state and that framework-free
+ * engine.
  */
 import { useCallback, useEffect, useMemo } from 'react';
 import type { FocusBackgroundSettings, UserSettings } from '../../types';
@@ -20,10 +20,21 @@ import {
   NONE_BACKGROUND_ID,
   type FocusBackgroundOption,
 } from './backgroundConfig';
-import { playAmbient, setAmbientVolume, stopAmbient, stopAmbientNow } from './AudioManager';
+import {
+  playAmbient,
+  setAmbientVolume,
+  stopAmbient,
+  stopAmbientNow,
+  playMusic,
+  setMusicVolume as setMusicEngineVolume,
+  stopMusic,
+  stopMusicNow,
+} from './AudioManager';
 
 /** Fallback ambient level when nothing has been stored yet. */
 const DEFAULT_VOLUME = 0.14;
+/** Fallback music level: subtle, sits under the ambient bed. */
+const DEFAULT_MUSIC_VOLUME = 0.1;
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
 
@@ -40,6 +51,8 @@ export const normaliseFocusBackground = (
     id,
     audioEnabled: raw?.audioEnabled !== false,
     volume: typeof raw?.volume === 'number' ? clamp01(raw.volume) : DEFAULT_VOLUME,
+    musicEnabled: raw?.musicEnabled !== false,
+    musicVolume: typeof raw?.musicVolume === 'number' ? clamp01(raw.musicVolume) : DEFAULT_MUSIC_VOLUME,
   };
 };
 
@@ -50,12 +63,16 @@ export interface FocusBackgroundController {
   option: FocusBackgroundOption | null;
   volume: number;
   audioEnabled: boolean;
+  musicEnabled: boolean;
+  musicVolume: number;
   /** Whether focus mode is currently running (backdrop + audio should be on). */
   active: boolean;
   /** Persist a new selection. Call from a click handler (unlocks audio on iOS). */
   setId: (id: string) => void;
   setVolume: (volume: number) => void;
+  setMusicVolume: (volume: number) => void;
   toggleAudio: () => void;
+  toggleMusic: () => void;
 }
 
 interface UseFocusBackgroundArgs {
@@ -87,10 +104,18 @@ export const useFocusBackground = ({
     } else {
       stopAmbient();
     }
-  }, [active, stored.audioEnabled, stored.volume, option]);
+    if (active && stored.musicEnabled && option?.music) {
+      playMusic({ key: option.id, src: option.music.src }, stored.musicVolume);
+    } else {
+      stopMusic();
+    }
+  }, [active, stored.audioEnabled, stored.volume, stored.musicEnabled, stored.musicVolume, option]);
 
   // Leaving the app (unmount) should not leave a loop running behind.
-  useEffect(() => () => stopAmbientNow(), []);
+  useEffect(() => () => {
+    stopAmbientNow();
+    stopMusicNow();
+  }, []);
 
   // Called straight from click handlers so the play() call sits inside the
   // user gesture (iOS Safari rejects media started from a post-paint effect).
@@ -102,6 +127,11 @@ export const useFocusBackground = ({
       } else {
         stopAmbient();
       }
+      if (active && next.musicEnabled && nextOption?.music) {
+        playMusic({ key: nextOption.id, src: nextOption.music.src }, next.musicVolume);
+      } else {
+        stopMusic();
+      }
     },
     [active]
   );
@@ -111,10 +141,13 @@ export const useFocusBackground = ({
       const next: FocusBackgroundSettings = {
         ...stored,
         id,
-        // Picking a backdrop is an intent to use it: re-enable ambience.
+        // Picking a backdrop is an intent to use it: re-enable ambience + music.
         audioEnabled: id === NONE_BACKGROUND_ID ? stored.audioEnabled : true,
+        musicEnabled: id === NONE_BACKGROUND_ID ? stored.musicEnabled : true,
       };
-      if (next.id === stored.id && next.audioEnabled === stored.audioEnabled) return;
+      if (next.id === stored.id && next.audioEnabled === stored.audioEnabled && next.musicEnabled === stored.musicEnabled) {
+        return;
+      }
       // A newly selected track falls back to its own gentle default level the
       // first time it is chosen, so loud files never surprise anyone.
       if (next.id !== stored.id) {
@@ -124,6 +157,11 @@ export const useFocusBackground = ({
           'volume'
         );
         if (fresh?.audio && !hasUserLevel) next.volume = fresh.audio.volume;
+        const hasUserMusicLevel = Object.prototype.hasOwnProperty.call(
+          settings.focusBackground ?? {},
+          'musicVolume'
+        );
+        if (fresh?.music && !hasUserMusicLevel) next.musicVolume = fresh.music.volume;
       }
       commit(next);
       drive(next);
@@ -141,8 +179,23 @@ export const useFocusBackground = ({
     [active, commit, option, stored]
   );
 
+  const setMusicVolume = useCallback(
+    (volume: number) => {
+      const next: FocusBackgroundSettings = { ...stored, musicVolume: clamp01(volume) };
+      commit(next);
+      if (active && next.musicEnabled && option?.music) setMusicEngineVolume(next.musicVolume);
+    },
+    [active, commit, option, stored]
+  );
+
   const toggleAudio = useCallback(() => {
     const next: FocusBackgroundSettings = { ...stored, audioEnabled: !stored.audioEnabled };
+    commit(next);
+    drive(next);
+  }, [commit, drive, stored]);
+
+  const toggleMusic = useCallback(() => {
+    const next: FocusBackgroundSettings = { ...stored, musicEnabled: !stored.musicEnabled };
     commit(next);
     drive(next);
   }, [commit, drive, stored]);
@@ -152,10 +205,14 @@ export const useFocusBackground = ({
     option,
     volume: stored.volume,
     audioEnabled: stored.audioEnabled,
+    musicEnabled: stored.musicEnabled,
+    musicVolume: stored.musicVolume,
     active,
     setId,
     setVolume,
+    setMusicVolume,
     toggleAudio,
+    toggleMusic,
   };
 };
 

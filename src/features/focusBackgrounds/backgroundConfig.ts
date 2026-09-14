@@ -50,6 +50,8 @@ export interface FocusBackgroundOption {
   seed?: number;
   /** Ambient loop paired with this backdrop. Omit for silence. */
   audio?: { src: string; volume: number };
+  /** Optional melodic track layered *under* the ambient while focus is active. */
+  music?: { src: string; volume: number };
   /** CSS gradient shown while the thumbnail renders (or if p5 fails to load). */
   swatch: string;
   /** Tailwind classes for the legibility scrim drawn above the artwork. */
@@ -112,6 +114,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 2719,
     // CC0 "Heavenly Loop" — public/themes/audio/README.md
     audio: { src: '/themes/audio/music_ambient_drift.ogg', volume: 0.14 },
+    // CC0 "Emotional Piano Loop" — layered music track.
+    music: { src: '/themes/audio/music_piano.wav', volume: 0.16 },
     swatch: 'linear-gradient(160deg, #efe7d9 0%, #cbb79b 100%)',
     scrim: PAPER_SCRIM,
     animated: false,
@@ -125,6 +129,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 50219,
     // CC0 "Forest Ambience" — public/themes/audio/README.md
     audio: { src: '/themes/audio/forest_ambience.mp3', volume: 0.12 },
+    // CC0 "Ambient Relaxing Loop" — layered music track.
+    music: { src: '/themes/audio/music_deep_focus.ogg', volume: 0.14 },
     swatch: 'linear-gradient(160deg, #e9eee2 0%, #a9bb96 100%)',
     scrim: PAPER_SCRIM,
     animated: false,
@@ -138,6 +144,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 8821,
     // CC0 "Project Utopia" seamless drone — public/themes/audio/README.md
     audio: { src: '/themes/audio/music_midnight.ogg', volume: 0.11 },
+    // CC0 "Emotional Piano Loop" — layered music track.
+    music: { src: '/themes/audio/music_piano.wav', volume: 0.12 },
     swatch: 'linear-gradient(160deg, #1c1f27 0%, #3b4252 100%)',
     scrim: DARK_SCRIM,
     animated: false,
@@ -151,6 +159,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 13107,
     // CC0 "Calm Loop" — public/themes/audio/README.md
     audio: { src: '/themes/audio/music_lofi.mp3', volume: 0.11 },
+    // CC0 "Heavenly Loop" — layered music track (soft pad under the lo-fi).
+    music: { src: '/themes/audio/music_ambient_drift.ogg', volume: 0.12 },
     swatch: 'linear-gradient(160deg, #f6eaea 0%, #d7a9a4 100%)',
     scrim: PAPER_SCRIM,
     animated: false,
@@ -164,6 +174,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 6041,
     // Shares CC0 "Project Utopia" with Nocturne Bloom (see README.md).
     audio: { src: '/themes/audio/music_midnight.ogg', volume: 0.11 },
+    // CC0 "Emotional Piano Loop" — layered music track.
+    music: { src: '/themes/audio/music_piano.wav', volume: 0.12 },
     swatch: 'linear-gradient(160deg, #262a30 0%, #4a5560 100%)',
     scrim: DARK_SCRIM,
     animated: false,
@@ -177,6 +189,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 30331,
     // Shares CC0 "Heavenly Loop" with Minimal Flowers.
     audio: { src: '/themes/audio/music_ambient_drift.ogg', volume: 0.13 },
+    // CC0 "Calm Loop" — layered music track (lo-fi under the warm pad).
+    music: { src: '/themes/audio/music_lofi.mp3', volume: 0.12 },
     swatch: 'linear-gradient(160deg, #ecd5be 0%, #c4795a 100%)',
     scrim: PAPER_SCRIM,
     animated: false,
@@ -190,6 +204,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 70707,
     // CC0 "Rain on Window Loop" — public/themes/audio/README.md
     audio: { src: '/themes/audio/rain_window.m4a', volume: 0.14 },
+    // CC0 "Calm Loop" — layered music track (lo-fi rainy mood).
+    music: { src: '/themes/audio/music_lofi.mp3', volume: 0.14 },
     swatch: 'linear-gradient(160deg, #1f2530 0%, #0e1116 100%)',
     scrim: 'bg-black/28',
     // Gentle drift; frozen on frame one under prefers-reduced-motion.
@@ -204,6 +220,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 910111,
     // CC0 "wind1" — public/themes/audio/README.md
     audio: { src: '/themes/audio/snowfall_wind.m4a', volume: 0.12 },
+    // CC0 "Project Utopia" seamless drone — layered music track (cold).
+    music: { src: '/themes/audio/music_midnight.ogg', volume: 0.12 },
     swatch: 'linear-gradient(160deg, #92a0b0 0%, #e4e9ee 100%)',
     scrim: COLD_PAPER_SCRIM,
     animated: true,
@@ -217,6 +235,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 4200,
     // CC0 "Ambient Relaxing Loop" — public/themes/audio/README.md
     audio: { src: '/themes/audio/music_deep_focus.ogg', volume: 0.12 },
+    // CC0 "Emotional Piano Loop" — layered music track (cinematic peaks).
+    music: { src: '/themes/audio/music_piano.wav', volume: 0.13 },
     swatch: 'linear-gradient(160deg, #28303f 0%, #10131a 100%)',
     // The brightened ridges carry their own separation; only a whisper of scrim.
     scrim: 'bg-black/16',
@@ -231,6 +251,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 4217,
     // CC BY 3.0 "Oceanwavescrushing" — credited in the picker footer
     audio: { src: '/themes/audio/seaside_waves.ogg', volume: 0.12 },
+    // CC0 "Ambient Relaxing Loop" — layered music track (airy pad over waves).
+    music: { src: '/themes/audio/music_deep_focus.ogg', volume: 0.13 },
     swatch: 'linear-gradient(180deg, #bcb0ac 0%, #d4c8b8 52%, #565f68 100%)',
     scrim: BRIGHT_SCRIM,
     thumbCrop: 'center 44%',
@@ -245,6 +267,8 @@ export const FOCUS_BACKGROUND_OPTIONS: FocusBackgroundOption[] = [
     seed: 4201,
     // CC BY 4.0 "Fire of the forge" — credited in the picker footer
     audio: { src: '/themes/audio/library_fireplace.ogg', volume: 0.13 },
+    // CC0 "Emotional Piano Loop" — layered music track (warm piano by the fire).
+    music: { src: '/themes/audio/music_piano.wav', volume: 0.15 },
     swatch: 'linear-gradient(150deg, #2a221c 0%, #100c09 100%)',
     // Already the darkest piece in the set: any more overlay kills the shelf detail.
     scrim: 'bg-black/10',

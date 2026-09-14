@@ -16,6 +16,7 @@ const ASSETS_TO_CACHE = [
   '/themes/audio/music_midnight.ogg',
   '/themes/audio/music_lofi.mp3',
   '/themes/audio/music_deep_focus.ogg',
+  '/themes/audio/music_piano.wav',
   '/themes/audio/library_fireplace.ogg',
   '/themes/audio/rain_window.m4a',
   '/themes/audio/snowfall_wind.m4a'

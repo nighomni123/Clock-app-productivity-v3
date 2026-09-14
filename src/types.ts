@@ -33,6 +33,10 @@ export interface FocusBackgroundSettings {
   audioEnabled: boolean;
   /** Ambient level, 0..1 (media element volume). */
   volume: number;
+  /** Whether the backdrop's paired music track also plays (layered under ambient). */
+  musicEnabled?: boolean;
+  /** Music level, 0..1 (media element volume). Kept separate from `volume`. */
+  musicVolume?: number;
 }
 
 export interface ExamState {
