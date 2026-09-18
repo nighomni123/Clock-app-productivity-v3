@@ -44,41 +44,30 @@ export function parseDelimited(text: string): string[][] {
   }
   const delimiter = Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0];
 
+  // Use regex-based parsing for standard CSV (handles quoted fields and escaped quotes)
   const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += ch;
+  const lines = text.split(/\r?\n/);
+  
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    // Match fields: either "quoted content" or unquoted content until delimiter/end
+    const fields: string[] = [];
+    const regex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+    const parts = line.split(regex);
+    
+    for (const part of parts) {
+      let field = part.trim();
+      // Remove surrounding quotes and unescape internal quotes
+      if (field.startsWith('"') && field.endsWith('"')) {
+        field = field.slice(1, -1).replace(/""/g, '"');
       }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === delimiter) {
-      row.push(field);
-      field = '';
-    } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && text[i + 1] === '\n') i++;
-      row.push(field);
-      field = '';
-      if (row.length > 1 || row[0].trim() !== '') rows.push(row);
-      row = [];
-    } else {
-      field += ch;
+      fields.push(field);
+    }
+    
+    if (fields.length > 1 || fields[0].trim() !== '') {
+      rows.push(fields);
     }
   }
-  row.push(field);
-  if (row.length > 1 || row[0].trim() !== '') rows.push(row);
 
   return rows;
 }

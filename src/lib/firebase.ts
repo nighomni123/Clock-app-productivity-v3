@@ -68,7 +68,7 @@ export const getOrGenerateLocalGuestUid = (): string => {
   if (typeof window === 'undefined') return 'guest_default';
   let guestUid = localStorage.getItem('focus_clock_guest_uid');
   if (!guestUid) {
-    guestUid = 'guest_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+    guestUid = 'guest_' + crypto.randomUUID();
     localStorage.setItem('focus_clock_guest_uid', guestUid);
   }
   return guestUid;

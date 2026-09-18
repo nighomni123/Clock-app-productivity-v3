@@ -94,6 +94,8 @@ const LOCAL_KEYS = {
   notes: 'focus_local_notes'
 } as const;
 
+const LOCAL_KEY_ENTRIES = Object.entries(LOCAL_KEYS) as [keyof typeof LOCAL_KEYS, string][];
+
 function loadLocal<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -244,34 +246,28 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocalOnlyMode]);
 
-  // Mirror state into localStorage while in local-only mode
+  // Mirror state into localStorage while in local-only mode (consolidated from 9 separate effects)
   useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.tasks, tasks);
-  }, [tasks, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.activityLogs, activityLogs);
-  }, [activityLogs, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.distractions, distractions);
-  }, [distractions, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.daily, { dateKey: getTodayKey(), stats: todayStats });
-  }, [todayStats, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.settings, settings);
-  }, [settings, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.dailyTarget, dailyTarget);
-  }, [dailyTarget, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.exam, exam);
-  }, [exam, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.intention, intention);
-  }, [intention, isLocalOnlyMode]);
-  useEffect(() => {
-    if (isLocalOnlyMode) saveLocal(LOCAL_KEYS.notes, notes);
-  }, [notes, isLocalOnlyMode]);
+    if (!isLocalOnlyMode) return;
+    
+    LOCAL_KEY_ENTRIES.forEach(([stateKey, storageKey]) => {
+      const value = (() => {
+        switch (stateKey) {
+          case 'tasks': return tasks;
+          case 'activityLogs': return activityLogs;
+          case 'distractions': return distractions;
+          case 'daily': return { dateKey: getTodayKey(), stats: todayStats };
+          case 'settings': return settings;
+          case 'dailyTarget': return dailyTarget;
+          case 'exam': return exam;
+          case 'intention': return intention;
+          case 'notes': return notes;
+        }
+      })();
+      
+      saveLocal(storageKey, value);
+    });
+  }, [tasks, activityLogs, distractions, todayStats, settings, dailyTarget, exam, intention, notes, isLocalOnlyMode]);
 
   // Sync User Document & Settings from Firestore (Visibility-Aware)
   useEffect(() => {
@@ -460,23 +456,30 @@ export default function App() {
   };
 
   // User Actions & Handlers
-  const handleUpdateSettings = useCallback(
-    async (newSettings: UserSettings) => {
-      setSettings(newSettings);
-      if (syncCode) {
-        updateSyncDoc(syncCode, { settings: newSettings });
+  // Generic document update handler to reduce duplication across handleUpdate* callbacks
+  const handleUpdateDoc = useCallback(
+    async (collectionName: 'users' | 'sync_sessions', docId: string, field: string, value: any) => {
+      if (syncCode && collectionName === 'sync_sessions') {
+        updateSyncDoc(syncCode, { [field]: value });
         return;
       }
-      // Local-only mode: state already updated; localStorage mirror persists it
       if (isLocalOnlyMode) return;
       if (!userAuth?.uid) return;
       try {
-        await setDoc(doc(db, 'users', userAuth.uid), { settings: newSettings }, { merge: true });
+        await setDoc(doc(db, collectionName, docId), { [field]: value }, { merge: true });
       } catch (err) {
-        console.warn('Error saving settings:', err);
+        console.warn(`Error saving ${field}:`, err);
       }
     },
-    [userAuth?.uid, syncCode]
+    [userAuth?.uid, syncCode, isLocalOnlyMode]
+  );
+
+  const handleUpdateSettings = useCallback(
+    async (newSettings: UserSettings) => {
+      setSettings(newSettings);
+      await handleUpdateDoc('users', userAuth!.uid, 'settings', newSettings);
+    },
+    [handleUpdateDoc]
   );
 
   // Focus-mode artwork backdrop + paired ambient audio. Owned once here so the
@@ -492,37 +495,17 @@ export default function App() {
   const handleUpdateDailyTarget = useCallback(
     async (newTarget: DailyTarget) => {
       setDailyTarget(newTarget);
-      if (syncCode) {
-        updateSyncDoc(syncCode, { dailyTarget: newTarget });
-        return;
-      }
-      if (isLocalOnlyMode) return;
-      if (!userAuth?.uid) return;
-      try {
-        await setDoc(doc(db, 'users', userAuth.uid), { dailyTarget: newTarget }, { merge: true });
-      } catch (err) {
-        console.warn('Error saving daily target:', err);
-      }
+      await handleUpdateDoc('users', userAuth!.uid, 'dailyTarget', newTarget);
     },
-    [userAuth?.uid, syncCode]
+    [handleUpdateDoc]
   );
 
   const handleUpdateExam = useCallback(
     async (newExam: ExamState) => {
       setExam(newExam);
-      if (syncCode) {
-        updateSyncDoc(syncCode, { exam: newExam });
-        return;
-      }
-      if (isLocalOnlyMode) return;
-      if (!userAuth?.uid) return;
-      try {
-        await setDoc(doc(db, 'users', userAuth.uid), { exam: newExam }, { merge: true });
-      } catch (err) {
-        console.warn('Error saving exam:', err);
-      }
+      await handleUpdateDoc('users', userAuth!.uid, 'exam', newExam);
     },
-    [userAuth?.uid, syncCode]
+    [handleUpdateDoc]
   );
 
   const handleAddActivityLog = useCallback(
@@ -625,14 +608,10 @@ export default function App() {
 
       if (intentionTimeoutRef.current) clearTimeout(intentionTimeoutRef.current);
       intentionTimeoutRef.current = setTimeout(async () => {
-        try {
-          await setDoc(doc(db, 'users', userAuth.uid), { intention: newIntention }, { merge: true });
-        } catch (err) {
-          handleFirestoreError(err, 'write', `users/${userAuth.uid}`);
-        }
+        await handleUpdateDoc('users', userAuth!.uid, 'intention', newIntention);
       }, 2500); // 2.5s debounce to save writes
     },
-    [userAuth?.uid, syncCode]
+    [handleUpdateDoc, syncCode, isLocalOnlyMode]
   );
 
   const handleAddTask = useCallback(
