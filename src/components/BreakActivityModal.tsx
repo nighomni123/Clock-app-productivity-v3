@@ -45,6 +45,7 @@ export const BreakActivityModal: React.FC<BreakActivityModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+            aria-label="Close break activity suggestions"
           >
             <X className="w-5 h-5 text-zinc-400" />
           </button>
