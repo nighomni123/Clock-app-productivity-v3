@@ -1,3 +1,5 @@
+import { CustomSound } from '../types';
+
 const SOUNDS: Record<string, Array<{ frequency: number; delay: number; duration: number; type: OscillatorType }>> = {
   'Soft Bell': [
     { frequency: 523.25, delay: 0, duration: 1.6, type: 'sine' },
@@ -31,7 +33,7 @@ const getAudioContext = () => {
   if (typeof window === 'undefined') return null;
   const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextClass) return null;
-  
+
   if (!sharedAudioContext) {
     sharedAudioContext = new AudioContextClass();
   }
@@ -41,8 +43,15 @@ const getAudioContext = () => {
   return sharedAudioContext;
 };
 
-export const playSound = (soundName: string, volume = 0.55) => {
+export const playSound = (soundName: string, volume = 0.55, customSounds?: CustomSound[]) => {
   try {
+    // Check if it's a custom sound first
+    const customSound = customSounds?.find(s => s.name === soundName);
+    if (customSound && customSound.url) {
+      playCustomSound(customSound.url, volume);
+      return;
+    }
+
     const context = getAudioContext();
     if (!context) return;
     const sequence = SOUNDS[soundName] || SOUNDS['Soft Bell'];
@@ -57,7 +66,7 @@ export const playSound = (soundName: string, volume = 0.55) => {
 
       oscillator.type = tone.type;
       oscillator.frequency.setValueAtTime(tone.frequency, start);
-      
+
       gain.gain.setValueAtTime(Math.max(0.0001, safeVolume * 0.25), start);
       gain.gain.exponentialRampToValueAtTime(0.0001, end);
 
@@ -72,4 +81,56 @@ export const playSound = (soundName: string, volume = 0.55) => {
   }
 };
 
+// Play custom sound from URL (file or data URI)
+const playCustomSound = (url: string, volume = 0.55) => {
+  try {
+    const audio = new Audio(url);
+    audio.volume = Math.min(1, Math.max(0, Number(volume) || 0));
+    audio.play().catch(err => {
+      console.warn('Custom sound playback failed:', err);
+    });
+  } catch (error) {
+    console.error('Unable to play custom sound:', error);
+  }
+};
+
 export const SOUND_NAMES = Object.keys(SOUNDS);
+
+/**
+ * Add a custom sound to the available sounds
+ */
+export const addCustomSound = async (
+  file: File,
+  name: string
+): Promise<CustomSound | null> => {
+  try {
+    // Convert file to base64 data URI for localStorage storage
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const customSound: CustomSound = {
+      id: `custom_${Date.now()}`,
+      name,
+      url: dataUri,
+      createdAt: Date.now()
+    };
+
+    return customSound;
+  } catch (error) {
+    console.error('Failed to add custom sound:', error);
+    return null;
+  }
+};
+
+/**
+ * Get all available sound names including custom sounds
+ */
+export const getAllSoundNames = (customSounds?: CustomSound[]): string[] => {
+  const builtIn = SOUND_NAMES;
+  const custom = customSounds?.map(s => s.name) || [];
+  return [...builtIn, ...custom];
+};
