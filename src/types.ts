@@ -18,6 +18,15 @@ export interface UserSettings {
    * normalise on read (see `normaliseFocusBackground`).
    */
   focusBackground?: FocusBackgroundSettings;
+  /** Custom sounds uploaded by the user (URL or base64 data URIs). */
+  customSounds?: CustomSound[];
+}
+
+export interface CustomSound {
+  id: string;
+  name: string;
+  url: string;
+  createdAt: number;
 }
 
 /**
@@ -160,4 +169,48 @@ export interface WeeklyInsight {
 export interface WeeklyReview {
   summary: string;
   insights: WeeklyInsight[];
+}
+
+/** A tag/category that can be attached to a focus session for analytics. */
+export interface SessionTag {
+  id: string;
+  name: string;
+  color: string; // hex color
+  createdAt: number;
+}
+
+/** Extended StudySession with tagging support for analytics. */
+export interface StudySessionWithTag extends StudySession {
+  tags?: string[]; // array of SessionTag ids
+}
+
+/** Break activity suggestion for healthy break habits. */
+export interface BreakActivitySuggestion {
+  id: string;
+  title: string;
+  description: string;
+  durationMinutes: number;
+  category: 'stretch' | 'hydrate' | 'breathe' | 'walk' | 'rest';
+}
+
+/** Gamification achievement/badge. */
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  condition: (stats: GamificationStats) => boolean;
+  unlockedAt?: number;
+}
+
+/** Stats used for gamification/achievement tracking. */
+export interface GamificationStats {
+  totalFocusMinutes: number;
+  totalSessions: number;
+  currentStreak: number;
+  longestStreak: number;
+  sessionsToday: number;
+  minutesToday: number;
+  completedTasks: number;
+  distractionFreeSessions: number;
 }
