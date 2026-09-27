@@ -126,14 +126,27 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // App Data States
-  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
-  const [exam, setExam] = useState<ExamState>({ name: '', date: '' });
-  const [intention, setIntention] = useState<string>('');
+  // Seed from the localStorage mirror immediately (before auth/Firestore resolve)
+  // so a setting toggled in one tab is never reverted to defaults when another
+  // tab remounts or when async hydration races a fresh user edit.
+  const [settings, setSettings] = useState<UserSettings>(() => ({
+    ...DEFAULT_SETTINGS,
+    ...loadLocal<Partial<UserSettings>>(LOCAL_KEYS.settings, {})
+  }));
+  const [exam, setExam] = useState<ExamState>(() =>
+    loadLocal<ExamState>(LOCAL_KEYS.exam, { name: '', date: '' })
+  );
+  const [intention, setIntention] = useState<string>(() =>
+    loadLocal<string>(LOCAL_KEYS.intention, '')
+  );
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [distractions, setDistractions] = useState<DistractionItem[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<string>('');
-  const [dailyTarget, setDailyTarget] = useState<DailyTarget>(DEFAULT_DAILY_TARGET);
+  const [dailyTarget, setDailyTarget] = useState<DailyTarget>(() => ({
+    ...DEFAULT_DAILY_TARGET,
+    ...loadLocal<Partial<DailyTarget>>(LOCAL_KEYS.dailyTarget, {})
+  }));
   const [todayStats, setTodayStats] = useState<DailyStats>({
     focusMinutes: 0,
     sessions: 0,
@@ -152,6 +165,22 @@ export default function App() {
   const notesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intentionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dailySessionsRef = useRef<StudySession[]>([]);
+
+  // Timestamp of the most recent *local* user edit to preference fields.
+  // Firestore snapshot handlers compare against this so a stale server copy
+  // (initial snapshot after re-subscribe, or a rejected/lost write) can never
+  // clobber a setting the user just changed — that was why e.g. the
+  // clockAnimation Rolling/Static toggle reverted when switching tabs.
+  const localPrefEditTsRef = useRef<number>(0);
+  const markLocalPrefEdit = useCallback(() => {
+    localPrefEditTsRef.current = Date.now();
+  }, []);
+  // Ignore remote preference data that is older than our last local edit by
+  // more than a small reconciliation window (guards against echo loops while
+  // still allowing genuine cross-device/sync-session updates to apply).
+  const prefsEditedRecently = useCallback(() => {
+    return localPrefEditTsRef.current > 0 && Date.now() - localPrefEditTsRef.current < 15000;
+  }, []);
 
   // Track tab visibility to pause real-time Firestore listeners when app is hidden/in background
   useEffect(() => {
@@ -207,14 +236,17 @@ export default function App() {
     const unsub = onSnapshot(doc(db, 'sync_sessions', syncCode), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-        if (data.exam) setExam(data.exam);
-        if (data.intention !== undefined) setIntention(data.intention);
+        // Don't let a stale server snapshot overwrite preferences the user
+        // just changed locally (see localPrefEditTsRef).
+        const freshPrefs = !prefsEditedRecently();
+        if (data.settings && freshPrefs) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+        if (data.exam && freshPrefs) setExam(data.exam);
+        if (data.intention !== undefined && freshPrefs) setIntention(data.intention);
         if (data.tasks) setTasks(data.tasks);
         if (data.distractions) setDistractions(data.distractions);
         if (data.activityLogs) setActivityLogs(data.activityLogs);
         if (data.notes) setNotes(data.notes);
-        if (data.dailyTarget) setDailyTarget(data.dailyTarget);
+        if (data.dailyTarget && freshPrefs) setDailyTarget(data.dailyTarget);
         if (data.todayStats) setTodayStats(data.todayStats);
       }
     });
@@ -279,10 +311,17 @@ export default function App() {
       (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
-          if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-          if (data.dailyTarget) setDailyTarget({ ...DEFAULT_DAILY_TARGET, ...data.dailyTarget });
-          if (data.exam) setExam(data.exam);
-          if (data.intention !== undefined) setIntention(data.intention);
+          // Guard against stale server data reverting a just-changed local
+          // preference (e.g. clockAnimation Rolling/Static) when this listener
+          // re-subscribes on tab-visibility changes.
+          if (data.settings && !prefsEditedRecently()) {
+            setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+          }
+          if (data.dailyTarget && !prefsEditedRecently()) {
+            setDailyTarget({ ...DEFAULT_DAILY_TARGET, ...data.dailyTarget });
+          }
+          if (data.exam && !prefsEditedRecently()) setExam(data.exam);
+          if (data.intention !== undefined && !prefsEditedRecently()) setIntention(data.intention);
         } else {
           // Initialize default user record
           setDoc(
@@ -474,12 +513,18 @@ export default function App() {
     [userAuth?.uid, syncCode, isLocalOnlyMode]
   );
 
+  // Optimistically mirror user-preference fields to the localStorage cache on
+  // every change — not just in local-only guest mode. This guarantees a toggle
+  // (e.g. clockAnimation Rolling/Static) survives tab switches, remounts and
+  // reloads even if the Firestore write is slow, rejected, or lost while offline.
   const handleUpdateSettings = useCallback(
     async (newSettings: UserSettings) => {
+      markLocalPrefEdit();
       setSettings(newSettings);
+      saveLocal(LOCAL_KEYS.settings, newSettings);
       await handleUpdateDoc('users', userAuth!.uid, 'settings', newSettings);
     },
-    [handleUpdateDoc]
+    [handleUpdateDoc, markLocalPrefEdit]
   );
 
   // Focus-mode artwork backdrop + paired ambient audio. Owned once here so the
@@ -494,18 +539,22 @@ export default function App() {
 
   const handleUpdateDailyTarget = useCallback(
     async (newTarget: DailyTarget) => {
+      markLocalPrefEdit();
       setDailyTarget(newTarget);
+      saveLocal(LOCAL_KEYS.dailyTarget, newTarget);
       await handleUpdateDoc('users', userAuth!.uid, 'dailyTarget', newTarget);
     },
-    [handleUpdateDoc]
+    [handleUpdateDoc, markLocalPrefEdit]
   );
 
   const handleUpdateExam = useCallback(
     async (newExam: ExamState) => {
+      markLocalPrefEdit();
       setExam(newExam);
+      saveLocal(LOCAL_KEYS.exam, newExam);
       await handleUpdateDoc('users', userAuth!.uid, 'exam', newExam);
     },
-    [handleUpdateDoc]
+    [handleUpdateDoc, markLocalPrefEdit]
   );
 
   const handleAddActivityLog = useCallback(
@@ -598,7 +647,9 @@ export default function App() {
 
   const handleUpdateIntention = useCallback(
     (newIntention: string) => {
+      markLocalPrefEdit();
       setIntention(newIntention);
+      saveLocal(LOCAL_KEYS.intention, newIntention);
       if (syncCode) {
         updateSyncDoc(syncCode, { intention: newIntention });
         return;
@@ -611,7 +662,7 @@ export default function App() {
         await handleUpdateDoc('users', userAuth!.uid, 'intention', newIntention);
       }, 2500); // 2.5s debounce to save writes
     },
-    [handleUpdateDoc, syncCode, isLocalOnlyMode]
+    [handleUpdateDoc, syncCode, isLocalOnlyMode, markLocalPrefEdit]
   );
 
   const handleAddTask = useCallback(
